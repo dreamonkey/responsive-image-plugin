@@ -1,0 +1,4 @@
+LOADER=thumbor.loaders.file_loader
+RESULT_STORAGE_EXPIRATION_SECONDS=86400
+STORES_CRYPTO_KEY_FOR_EACH_IMAGE=True
+DETECTORS=['thumbor.detectors.face_detector','thumbor.detectors.profile_detector','thumbor.detectors.feature_detector']
