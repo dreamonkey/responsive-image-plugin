@@ -1,12 +1,13 @@
 import MemoryFileSystem from 'memory-fs';
 import { resolve } from 'path';
-import { webpack, Stats } from 'webpack';
 import { DeepPartial } from 'ts-essentials';
-import { ResponsiveImageLoaderConfig } from '../src/config';
+import { Stats, webpack } from 'webpack';
+import { ResponsiveImagePluginConfig } from '../src/config';
+import ResponsiveImagePlugin from '../src/responsive-image-plugin';
 
 export async function compiler(
   entryPath: string,
-  options: DeepPartial<ResponsiveImageLoaderConfig> = {},
+  options: DeepPartial<ResponsiveImagePluginConfig> = {},
 ): Promise<Stats> {
   const compiler = webpack({
     mode: 'production',
@@ -16,6 +17,7 @@ export async function compiler(
       path: resolve(__dirname),
       filename: 'bundle.js',
     },
+    plugins: [new ResponsiveImagePlugin(options)],
     module: {
       rules: [
         {
@@ -25,10 +27,7 @@ export async function compiler(
             // Transforms into a JS module returning the raw generated string
             'raw-loader',
             // Our loader
-            {
-              loader: resolve(__dirname, '../src/responsive-image-loader.ts'),
-              options,
-            },
+            { loader: resolve(__dirname, '../src/responsive-image-loader.ts') },
           ],
         },
       ],
@@ -44,7 +43,14 @@ export async function compiler(
       }
       if (stats) {
         if (stats.hasErrors()) {
-          reject(new Error(stats.toJson().errors?.join(' // ')));
+          reject(
+            new Error(
+              stats
+                .toJson()
+                .errors?.map(({ message }) => message)
+                .join(' // '),
+            ),
+          );
         }
 
         resolve(stats);

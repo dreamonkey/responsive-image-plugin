@@ -1,12 +1,7 @@
-import { ResponsiveImageLoaderContext } from '../config';
-import { Breakpoint, SupportedImageFormats } from '../base';
+import { BaseAdapter, SupportedImageFormats } from '../base';
 
-export type ConversionAdapter = (
-  this: ResponsiveImageLoaderContext,
-  sourcePath: string,
-  destinationPath: string,
-  uriWithoutHash: string,
-  format: SupportedImageFormats,
-) => Promise<Breakpoint>;
+export type ConversionAdapter = BaseAdapter<
+  [sourcePath: string, format: SupportedImageFormats]
+>;
 
 export type ConversionAdapterPresets = 'sharp';

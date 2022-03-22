@@ -11,17 +11,18 @@ import {
   omit,
   union,
 } from 'lodash';
+import { format, parse } from 'path';
 import { Dictionary } from 'ts-essentials';
 import {
   BaseResponsiveImage,
   BaseSource,
   generateUri,
+  getTempImagesDir,
+  pluginContext,
   resolveAliases,
-  ViewportAliasesMap,
 } from './base';
-import { ResponsiveImageLoaderContext } from './config';
 import { deepFreeze, selectFromPreset } from './helpers';
-import { ResponsiveImage } from './parsing';
+import { resolveImagePath, ResponsiveImage } from './parsing';
 import { thumborDockerTransformer } from './transformers/thumbor/thumbor';
 import {
   TransformationAdapter,
@@ -31,6 +32,7 @@ import {
 interface BaseTransformationDescriptor {
   maxViewport: number;
   size: number;
+  isCustom: boolean;
 }
 
 interface ProcessableTransformationDescriptor
@@ -49,10 +51,14 @@ export type TransformationDescriptor =
 export function isCustomTransformation(
   transformation: TransformationDescriptor,
 ): transformation is CustomTransformationDescriptor {
-  return has(transformation, 'path');
+  return transformation.isCustom;
 }
 
 type Transformation = { path: string } | { ratio: string };
+
+export function hasPathProperty(transformation: Transformation): boolean {
+  return has(transformation, 'path');
+}
 
 interface TransformationMap {
   [index: string]: Transformation;
@@ -67,9 +73,7 @@ export interface TransformationInlineOptions {
   transformationsToIgnore: boolean | string[];
 }
 
-export type TransformationSource = BaseSource & {
-  maxViewport: number;
-} & Transformation;
+export type TransformationSource = BaseSource & TransformationDescriptor;
 
 export type TransformationResponsiveImage = BaseResponsiveImage & {
   options: {
@@ -165,6 +169,7 @@ function generateDescriptors(
 
     return {
       ...transformation,
+      isCustom: hasPathProperty(transformation),
       maxViewport,
     };
   });
@@ -175,13 +180,12 @@ export function normalizeTransformations(
     inlineTransformations,
     transformationsToIgnore,
   }: TransformationInlineOptions,
-  { defaultRatio, defaultTransformations, transformer }: TransformationConfig,
   sizes: Dictionary<number>,
-  viewportAliases: ViewportAliasesMap,
 ): TransformationDescriptor[] {
-  if (isNull(transformer)) {
-    return [];
-  }
+  const {
+    artDirection: { defaultRatio, defaultTransformations },
+    viewportAliases,
+  } = pluginContext.options;
 
   const filteredDefaultTransformations =
     transformationsToIgnore === false
@@ -209,7 +213,7 @@ export function normalizeTransformations(
     (transformation, name) => {
       defaults(
         transformation,
-        !has(transformation, 'path') ? { ratio: defaultRatio } : {},
+        !hasPathProperty(transformation) ? { ratio: defaultRatio } : {},
       );
 
       return {
@@ -224,10 +228,9 @@ export function normalizeTransformations(
 
 export const generateTransformationUri = (
   path: string,
-  content: Buffer,
   transformation: TransformationDescriptor,
 ): ReturnType<typeof generateUri> =>
-  generateUri(path, content, () => {
+  generateUri(path, () => {
     const { maxViewport, size } = transformation;
     // 'tb' stands for 'transformation breakpoint'
     let pathBody = `-tb_${maxViewport}`;
@@ -254,24 +257,83 @@ const presetTransformers: TransformationAdapterPresetsMap = deepFreeze({
   thumbor: thumborDockerTransformer,
 });
 
-export function transformImage(
-  this: ResponsiveImageLoaderContext,
-  imagePath: string,
-  transformations: TransformationDescriptor[],
-  transformer: TransformationConfig['transformer'],
-): Promise<TransformationSource[]> {
-  if (typeof transformer === 'string') {
-    try {
-      transformer = selectFromPreset(presetTransformers, transformer);
-    } catch (e) {
-      this.emitError(e as Error);
-      transformer = null;
+export const pendingTransformations: [
+  sourceImagePath: string,
+  transformationSource: TransformationSource,
+  uri: string,
+][] = [];
+
+// Used by the loader
+export function applyTransformations(
+  rootContext: string,
+  context: string,
+  image: ResponsiveImage,
+): void {
+  const { transformer } = pluginContext.options.artDirection;
+
+  // Manage transformations only on images explicitly opting-in
+  if (isNull(transformer) || !isTransformationResponsiveImage(image)) {
+    return;
+  }
+
+  const transformations = normalizeTransformations(
+    image.options.inlineArtDirection,
+    image.options.sizes,
+  );
+
+  // Normalizes paths of custom transformations
+  each(transformations, (transformation) => {
+    if (isCustomTransformation(transformation)) {
+      transformation.path = resolveImagePath(
+        rootContext,
+        context,
+        transformation.path,
+      );
     }
+  });
+
+  const transformationSources = transformations.map((transformation) => {
+    const uri = generateTransformationUri(image.originalPath, transformation);
+
+    const { base } = parse(uri);
+    const path = format({
+      dir: getTempImagesDir(),
+      base,
+    });
+
+    const transformationSource = {
+      ...transformation,
+      path,
+      breakpoints: [
+        {
+          path,
+          uri,
+          width: transformation.maxViewport * transformation.size,
+        },
+      ],
+    } as TransformationSource;
+
+    // Store transformations for the pluging to execute them later on
+    pendingTransformations.push([
+      isCustomTransformation(transformation)
+        ? transformation.path
+        : image.originalPath,
+      transformationSource,
+      uri,
+    ]);
+
+    return transformationSource;
+  });
+
+  image.sources.push(...transformationSources);
+}
+
+export function resolveTransformer(
+  transformer: TransformationConfig['transformer'],
+) {
+  if (typeof transformer === 'string') {
+    transformer = selectFromPreset(presetTransformers, transformer);
   }
 
-  if (isNull(transformer) || transformations.length === 0) {
-    return Promise.resolve([]);
-  }
-
-  return transformer.call(this, imagePath, transformations);
+  return transformer;
 }

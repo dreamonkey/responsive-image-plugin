@@ -1,7 +1,7 @@
 import { deepFreeze } from './helpers';
-import { ResponsiveImageLoaderConfig } from './config';
+import { ResponsiveImagePluginConfig } from './config';
 
-export const DEFAULT_OPTIONS = deepFreeze<ResponsiveImageLoaderConfig>({
+export const DEFAULT_OPTIONS = deepFreeze<ResponsiveImagePluginConfig>({
   paths: {
     outputDir: '/',
     aliases: {},

@@ -2,13 +2,14 @@
 
 **New package, who dis?**
 
-A webpack loader to automagically bring your website images to a whole new level of responsiveness!
+A webpack plugin to automagically bring your website images to a whole new level of responsiveness!
+This plugin derives from our previous attempt to solve the same problem [using only a webpack loader](https://github.com/dreamonkey/responsive-image-loader).
 
-This loader tackles in an unified way three main problems with images on the web nowadays:
+This plugin tackles in an unified way three main problems with images on the web nowadays:
 
-- usage of most efficient image formats (automatic conversion);
+- intelligent images transformation based on focal points of an image (art direction);
 - images resizing to always serve the lightest bundle possible (resolution switching);
-- intelligent images transformation based on focal points of an image (art direction).
+- usage of most efficient image formats (automatic conversion).
 
 Moreover, we aim to automatize everything that doesn't strictly require your input:
 
@@ -18,16 +19,16 @@ Moreover, we aim to automatize everything that doesn't strictly require your inp
 - serving a fallback for older browsers;
 - and more!
 
-We also focused on flexiblity and customizability: conversion, resizing and transformation engines can be easily switched with your implementation, which you can then PR here and make available to others.
+We also focused on flexiblity and customizability: transformation, resizing and conversion engines can be easily switched with your implementation, which you can then PR here and make available to others.
 
 **Aren't there other tools doing the same stuff?**
 ![Well yes, but actually no](docs/well-yes-but-actually-no.jpg?raw=true)
 We found some notable tools while evaluating if it was worth to create our own package, but none of them combines all the requirements we now offer:
 
-- manages together conversion, resolution switching and art direction, with all their weird interactions;
+- manages together art direction, resolution switching and conversion, with all their weird interactions;
 - process images both when used via `<img>` tags and `background-image` CSS rules;
 - framework agnostic;
-- operates at build time (did anyone said SSG?);
+- operates at build time (useful for SSG builds);
 - works offline;
 - free;
 - open source;
@@ -40,7 +41,7 @@ For more info, check out the [issue](https://github.com/quasarframework/quasar/i
 - [Roadmap](#roadmap)
 - [Donations and shameless self-advertisement](#donations)
 - [Installation](#installation)
-  - [Loader](#loader)
+  - [Plugin](#plugin)
   - [Engines](#engines)
 - [Usage](#usage)
 - [Configuration](#configuration)
@@ -57,13 +58,13 @@ For more info, check out the [issue](https://github.com/quasarframework/quasar/i
 
 Features we'd like to implement, by most-wanted order.
 
+<!-- TODO: -->
+
 - [ ] [Add PNG to supported formats](https://github.com/dreamonkey/responsive-image-loader/issues/16)
-- [x] [Support background-images](https://github.com/dreamonkey/responsive-image-loader/issues/12)
 - [ ] [Define defaults for arbitrary groups of images](https://github.com/dreamonkey/responsive-image-loader/issues/10)
-- [x] [Support values in pixels for `size` option](https://github.com/dreamonkey/responsive-image-loader/issues/13)
 - [ ] [Write more granular unit tests](https://github.com/dreamonkey/responsive-image-loader/issues/17)
 - [ ] [Add TSDocs to public methods](https://github.com/dreamonkey/responsive-image-loader/issues/18)
-- [ ] [Support Cloudinary adapter for converter, transformer and resizer](https://github.com/dreamonkey/responsive-image-loader/issues/15)
+- [ ] [Support Cloudinary adapter for transformer, resizer and converter](https://github.com/dreamonkey/responsive-image-loader/issues/15)
 - [ ] [Support video conversion and processing](https://github.com/dreamonkey/responsive-image-loader/issues/11)
 - [ ] [Test with HMR](https://github.com/dreamonkey/responsive-image-loader/issues/14)
 - [ ] [Pass-through custom configuration to underlying engines](https://github.com/dreamonkey/responsive-image-loader/issues/19)
@@ -87,11 +88,13 @@ or
 
 `npm install -D @dreamonkey/responsive-image-loader`.
 
-### <span id="loader"></span> Loader
+### <span id="plugin"></span> Plugin
 
 #### Normal usage
 
-Add the loader into your webpack rules targetting `.html` files.
+Add the plugin into your webpack config.
+
+<!-- TODO: -->
 
 ```javascript
 webpackConf.module.rules.push({
@@ -324,7 +327,7 @@ You can check out the default configuration [here](defaults.ts).
 
 ```typescript
 // Full configuration, you won't ever need all this options
-const fullOptionsExample: ResponsiveImageLoaderConfig = {
+const fullOptionsExample: ResponsiveImagePluginConfig = {
   defaultSize: 1.0,
   viewportAliases: {
     xs: '699', // 0-699
@@ -364,7 +367,7 @@ const fullOptionsExample: ResponsiveImageLoaderConfig = {
 };
 
 // Example of a typical configuration, if using art direction
-const options: DeepPartial<ResponsiveImageLoaderConfig> = {
+const options: DeepPartial<ResponsiveImagePluginConfig> = {
   viewportAliases: {
     xs: '699', // 0-699
     sm: '1023', // 700-1023

@@ -5,7 +5,7 @@ import { Dictionary } from 'ts-essentials';
 import {
   BaseResponsiveImage,
   Breakpoint,
-  getPathAliases,
+  pluginContext,
   resolveAliases,
   SizesMap,
 } from './base';
@@ -28,6 +28,28 @@ interface TagDescriptor {
   type: 'background-image' | 'img-tag';
 }
 
+export function generateImgTagPlaceholder(path: string): string {
+  return `[[responsive:${path}]]`;
+}
+
+export function generateUrlPlaceholder(url: string): string {
+  return `[[responsive-url:${url}]]`;
+}
+
+function escapeSquareBrackets(text: string) {
+  return text.replace(/\[/g, '\\[').replace(/\]/g, '\\]');
+}
+
+export const IMG_TAG_PLACEHOLDER_PATTERN = new RegExp(
+  escapeSquareBrackets(generateImgTagPlaceholder('.+')),
+  'g',
+);
+
+export const URL_PLACEHOLDER_PATTERN = new RegExp(
+  escapeSquareBrackets(generateUrlPlaceholder('.+')),
+  'g',
+);
+
 const IMAGES_PATTERN = /<img.*?\/>/gs;
 const BACKGROUND_IMAGES_PATTERN =
   /<[a-z]\w*(?=[^<>]*\sresponsive-bg="\S+").*?>/gis;
@@ -46,16 +68,12 @@ const ART_DIRECTION_IGNORE_ATTRIBUTE_PATTERN =
 
 const imagesMatchesMap: { [index: string]: string } = {};
 
-function generatePlaceholder(path: string): string {
-  return `[[responsive:${path}]]`;
-}
-
 // Aliases are resolved relative to root level
 function resolvePathAliases(
   rootContext: string,
   imagePath: string,
 ): string[] | undefined {
-  for (const [pathAlias, pathAliasValue] of getPathAliases()) {
+  for (const [pathAlias, pathAliasValue] of pluginContext.pathAliases) {
     if (imagePath.startsWith(pathAlias)) {
       return [rootContext, pathAliasValue, imagePath.slice(pathAlias.length)];
     }
@@ -204,11 +222,11 @@ function generateReplacingTag(
   type: string,
 ): string {
   return type === 'img-tag'
-    ? generatePlaceholder(resolvedPath)
+    ? generateImgTagPlaceholder(resolvedPath)
     : // "background-image" doesn't remove the original tag,
       //  instead it adds a data-* marker and appends the placeholder after it.
       // This will trigger the generation of the element managing the image selection
-      `${tag.slice(0, -1)} data-responsive-bg>\n${generatePlaceholder(
+      `${tag.slice(0, -1)} data-responsive-bg>\n${generateImgTagPlaceholder(
         resolvedPath,
       )}\n`;
 }
@@ -217,12 +235,12 @@ export function parse(
   context: string,
   rootContext: string,
   source: string,
-  defaultSize: number,
-  viewportAliases: Dictionary<string>,
 ): {
   sourceWithPlaceholders: string;
   parsedImages: ResponsiveImage[];
 } {
+  const { defaultSize, viewportAliases } = pluginContext.options;
+
   const responsiveImages: ResponsiveImage[] = [];
 
   const tagsDescriptors = parseTags(source);
@@ -286,12 +304,12 @@ export function parse(
 
 function generateSrcSet(breakpoints: Breakpoint[]): string {
   if (breakpoints.length === 1) {
-    return breakpoints[0].uriWithHash;
+    return generateUrlPlaceholder(breakpoints[0].uri);
   }
 
   return breakpoints
     .sort(byIncreasingWidth)
-    .map(({ uriWithHash, width }) => `${uriWithHash} ${width}w`)
+    .map(({ uri, width }) => `${generateUrlPlaceholder(uri)} ${width}w`)
     .join(', ');
 }
 
@@ -366,7 +384,7 @@ export function enhance(
     }
 
     source = source.replace(
-      generatePlaceholder(image.originalPath),
+      generateImgTagPlaceholder(image.originalPath),
       enhancedImage,
     );
   }

@@ -1,22 +1,22 @@
 import { fromFile } from 'file-type';
+import sizeOf from 'image-size';
 import { isNull, isUndefined } from 'lodash';
 import { format as formatPath, join, parse } from 'path';
+import {
+  BaseResponsiveImage,
+  BaseSource,
+  generateUri,
+  pluginContext,
+  SupportedImageFormats,
+} from './base';
 import {
   ConversionAdapter,
   ConversionAdapterPresets,
 } from './converters/converters';
 import { sharpConverter } from './converters/sharp';
 import { deepFreeze, selectFromPreset } from './helpers';
-import {
-  BaseResponsiveImage,
-  BaseSource,
-  generateUri,
-  getTempImagesDir,
-  SupportedImageFormats,
-  getOuputDir,
-} from './base';
+import { ResponsiveImage } from './parsing';
 import { TransformationSource } from './transformation';
-import { ResponsiveImageLoaderContext } from './config';
 
 const PREFERRED_FORMAT_ORDER: string[] = [
   SupportedImageFormats.WebP.toString(),
@@ -53,9 +53,9 @@ function isFormatSupported(format: string): format is SupportedImageFormats {
 }
 
 // Detect extension by magic numbers instead of path extension (which can lie)
-async function detectSourceType(
+export async function guardAgainstUnsupportedSourceType(
   imagePath: string,
-): Promise<SupportedImageFormats> {
+): Promise<void> {
   const type = (await fromFile(imagePath))?.ext;
 
   if (isUndefined(type)) {
@@ -69,8 +69,6 @@ async function detectSourceType(
       )}`,
     );
   }
-
-  return type;
 }
 
 export function byMostEfficientFormat(
@@ -85,125 +83,119 @@ export function byMostEfficientFormat(
 
 export const generateConversionUri = (
   path: string,
-  content: Buffer,
 ): ReturnType<typeof generateUri> =>
   // 'c' stands for 'converted'
-  generateUri(path, content, () => '-c');
+  generateUri(path, () => '-c');
 
-async function generateFallbackSource(
-  this: ResponsiveImageLoaderContext,
-  converter: ConversionAdapter,
+function generateFallbackSource(
   sourcePath: string,
   size: number,
   format: SupportedImageFormats,
-): Promise<ConversionSource> {
+): ConversionSource {
   const { name } = parse(sourcePath);
-  const destinationPath = join(getTempImagesDir(), `${name}.${format}`);
-  const uri = join(getOuputDir(), `${name}.${format}`);
-
-  const fallbackBreakpoint = await converter.call(
-    this,
-    sourcePath,
-    destinationPath,
-    uri,
-    format,
+  const uri = generateConversionUri(
+    join(pluginContext.options.paths.outputDir, `${name}.${format}`),
   );
+
+  pendingConversions.push([sourcePath, format, uri]);
 
   return {
     path: sourcePath,
-    breakpoints: [fallbackBreakpoint],
+    breakpoints: [
+      {
+        path: sourcePath,
+        uri,
+        // TODO: we could use sharp here and into resizig, but it would force us to make everything async
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        width: sizeOf(sourcePath).width!,
+      },
+    ],
     size,
+    ratio: 'original',
     format,
   };
 }
 
-function changeExtension(
-  pathOrUri: string,
-  format: SupportedImageFormats,
-): string {
-  const { dir, name } = parse(pathOrUri);
-  return formatPath({
-    dir,
-    name,
-    ext: `.${format}`,
-  });
+function changeExtension(uri: string, format: SupportedImageFormats): string {
+  const { dir, name } = parse(uri);
+
+  return (
+    formatPath({
+      dir,
+      name,
+      ext: `.${format}`,
+    })
+      // Using 'dir' generates a string prefixed with '//' instead of '/' when dir and root are both '/'
+      // See https://github.com/nodejs/node/issues/22030
+      .replace('//', '/')
+  );
 }
 
-export async function convertImage(
-  this: ResponsiveImageLoaderContext,
-  responsiveImage: BaseResponsiveImage,
-  { converter, enabledFormats }: ConversionConfig,
-): Promise<ConversionResponsiveImage> {
-  if (typeof converter === 'string') {
-    try {
-      converter = selectFromPreset(presetConverters, converter);
-    } catch (e) {
-      this.emitError(e as Error);
-      converter = null;
-    }
-  }
+export const pendingConversions: [
+  sourceImagePath: string,
+  format: SupportedImageFormats,
+  uri: string,
+][] = [];
+
+export function applyConversions(image: ResponsiveImage): void {
+  const { converter, enabledFormats } = pluginContext.options.conversion;
 
   if (isNull(converter)) {
-    responsiveImage.sources = await Promise.all(
-      responsiveImage.sources.map(async (source) => ({
-        ...source,
-        format: await detectSourceType(source.path),
-      })),
-    );
+    image.sources = image.sources.map((source) => ({
+      ...source,
+      format: parse(source.path).ext.replace('.', ''),
+    }));
 
-    return Promise.resolve(responsiveImage as ConversionResponsiveImage);
+    return;
   }
 
   const availableFormats = Object.entries(enabledFormats)
     .filter(([, value]) => value === true)
     .map(([format]) => format) as SupportedImageFormats[];
 
-  responsiveImage.sources = (
-    await Promise.all(
-      availableFormats.map(async (format) => {
-        // Original image should processed like all others,
-        //  in case some optimizations are applied by the converter
-        // TODO: it's not clear why `converter` ignores previous type-narrowing code
-        //  when put inside a .map() which removes null and string types,
-        //  forcing us to cast it
+  image.sources = availableFormats
+    .map((format) => {
+      // Original image should be processed like all others,
+      //  in case some optimizations are applied by the converter
 
-        const convertedSources = await Promise.all(
-          responsiveImage.sources.map(async (source) => {
-            const convertedBreakpoints = await Promise.all(
-              source.breakpoints.map(async ({ path: sourcePath, uri }) => {
-                return await (converter as ConversionAdapter).call(
-                  this,
-                  sourcePath,
-                  changeExtension(sourcePath, format),
-                  changeExtension(uri, format),
-                  format,
-                );
-              }),
-            );
-
-            const convertedSource: ConversionSource = {
-              // Retain transformation metadata
-              ...source,
-              breakpoints: convertedBreakpoints,
+      const convertedSources = image.sources.map((source) => {
+        const convertedBreakpoints = source.breakpoints.map(
+          ({ path, uri: sourceUri, width }) => {
+            const uri = changeExtension(
+              generateConversionUri(sourceUri),
               format,
-            };
+            );
+            pendingConversions.push([path, format, uri]);
 
-            return convertedSource;
-          }),
+            return { path, uri, width };
+          },
         );
 
-        const fallbackSource = await generateFallbackSource.call(
-          this,
-          converter as ConversionAdapter,
-          responsiveImage.originalPath,
-          responsiveImage.options.sizes.__default,
+        const convertedSource: ConversionSource = {
+          // Retain transformation metadata
+          ...source,
+          breakpoints: convertedBreakpoints,
           format,
-        );
+        };
 
-        return [...convertedSources, fallbackSource];
-      }),
-    )
-  ).reduce((previous, current) => [...previous, ...current], []);
+        return convertedSource;
+      });
 
-  return responsiveImage as ConversionResponsiveImage;
+      const fallbackSource = generateFallbackSource(
+        image.originalPath,
+        image.options.sizes.__default,
+        format,
+      );
+
+      return [...convertedSources, fallbackSource];
+    })
+    .reduce((previous, current) => [...previous, ...current], []);
+}
+
+export function resolveConverter(converter: ConversionConfig['converter']) {
+  if (typeof converter === 'string') {
+    converter = selectFromPreset(presetConverters, converter);
+  }
+
+  return converter;
 }

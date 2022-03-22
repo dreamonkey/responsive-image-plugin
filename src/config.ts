@@ -7,14 +7,14 @@ import { deepFreeze } from './helpers';
 import { ResizingConfig } from './resizing';
 import { TransformationConfig } from './transformation';
 
-export interface ResponsiveImageLoaderConfig extends BaseConfig {
+export interface ResponsiveImagePluginConfig extends BaseConfig {
   conversion: ConversionConfig;
   artDirection: TransformationConfig;
   resolutionSwitching: ResizingConfig;
 }
 
 export type ResponsiveImageLoaderContext = LoaderContext<
-  DeepPartial<ResponsiveImageLoaderConfig>
+  DeepPartial<ResponsiveImagePluginConfig>
 >;
 
 declare module 'json-schema' {

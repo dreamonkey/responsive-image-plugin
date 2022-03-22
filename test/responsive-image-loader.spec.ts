@@ -1,6 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 import { writeFileSync } from 'fs';
 import { join, resolve } from 'path';
+import {
+  IMG_TAG_PLACEHOLDER_PATTERN,
+  URL_PLACEHOLDER_PATTERN,
+} from 'src/parsing';
 import { existsOrCreateDirectory } from '../src/base';
 import { getHashDigest } from '../src/helpers';
 import { compiler } from './compiler';
@@ -26,6 +30,11 @@ async function setup(
   const sourceWithEscapedQuotes = (await import(path)).default as string;
 
   return sourceWithEscapedQuotes.replace(/\\"/g, '"');
+}
+
+function assertNoPlaceholders(output: string) {
+  expect(output).not.toMatch(IMG_TAG_PLACEHOLDER_PATTERN);
+  expect(output).not.toMatch(URL_PLACEHOLDER_PATTERN);
 }
 
 describe('Responsive image loader', () => {
@@ -62,6 +71,7 @@ describe('Responsive image loader', () => {
             });
 
             expect(output).not.toMatch(/<picture>/);
+            assertNoPlaceholders(output);
           });
 
           it('should not be performed when no transformations are provided', async () => {
@@ -71,6 +81,7 @@ describe('Responsive image loader', () => {
             });
 
             expect(output).not.toMatch(/<picture>/);
+            assertNoPlaceholders(output);
           });
 
           it('should add mime type when at least one transformation is defined', async () => {
@@ -88,6 +99,7 @@ describe('Responsive image loader', () => {
             expect(output).toMatch(
               /<picture.*>.*<source.*type="image\/jpeg".*srcset=".*\.jpg.*".*\/>.*<\/picture>/gs,
             );
+            assertNoPlaceholders(output);
           });
 
           it('should apply transformations when defined as defaults', async () => {
@@ -110,6 +122,7 @@ describe('Responsive image loader', () => {
             expect(output).toMatch(
               /<picture.*>.*<source.*media="\(max-width: 1500px\)".*srcset=".*\/example-tb_1500-r_16_9-s_50.*\.jpg.*".*\/>.*<\/picture>/s,
             );
+            assertNoPlaceholders(output);
           });
 
           it('should apply transformation when defined via inline options', async () => {
@@ -131,6 +144,7 @@ describe('Responsive image loader', () => {
             expect(output).toMatch(
               /<picture.*>.*<source.*media="\(max-width: 600px\)".*srcset=".*\/example-tb_600-r_3_2-s_100.*\.jpg.*".*\/>.*<\/picture>/gs,
             );
+            assertNoPlaceholders(output);
           });
 
           it('should merge inline options with default transformations when both are provided', async () => {
@@ -155,6 +169,7 @@ describe('Responsive image loader', () => {
             expect(output).toMatch(
               /<picture.*>.*<source.*media="\(max-width: 600px\)".*srcset=".*\/example-tb_600-r_3_2-s_100.*\.jpg.*".*\/>.*<\/picture>/gs,
             );
+            assertNoPlaceholders(output);
           });
 
           it('should apply transformation when its name is based on aliases', async () => {
@@ -175,6 +190,7 @@ describe('Responsive image loader', () => {
             expect(output).toMatch(
               /<picture.*>.*<source.*media="\(max-width: 1200px\)".*srcset=".*\/example-tb_1200-r_2_3-s_100.*\.jpg.*".*\/>.*<\/picture>/gs,
             );
+            assertNoPlaceholders(output);
           });
 
           it('should error when transformation name is invalid', async () => {
@@ -224,6 +240,7 @@ describe('Responsive image loader', () => {
             expect(output).toMatch(
               /<picture.*>.*<source.*media="\(max-width: 600px\)".*srcset=".*\/example-tb_600-p-s_100.*\.jpg.*".*\/>.*<\/picture>/gs,
             );
+            assertNoPlaceholders(output);
           });
 
           it('should order transformations in ascending order', async () => {
@@ -244,6 +261,7 @@ describe('Responsive image loader', () => {
             expect(output).toMatch(
               /<picture.*>.*<source.*media="\(max-width: 300px\)".*\/>.*<source.*media="\(max-width: 1023px\)".*<source.*media="\(max-width: 1919px\)".*\/>.*<source.*media="\(max-width: 2400px\)".*\/>.*<\/picture>/gs,
             );
+            assertNoPlaceholders(output);
           });
 
           it('should preserve attributes on image tag', async () => {
@@ -261,6 +279,7 @@ describe('Responsive image loader', () => {
             expect(output).toMatch(
               /<picture.*>.*<img.*responsive.*src="\.\/example\.jpg".*class="hello".*fake-attribute.*alt="hey there".*>.*<\/picture>/gs,
             );
+            assertNoPlaceholders(output);
           });
 
           it('should create one source for each art-direction transformation', async () => {
@@ -290,6 +309,7 @@ describe('Responsive image loader', () => {
             expect(output).toMatch(
               /<picture.*>.*<source.*media="\(max-width: 1920px\)".*srcset=".*\/example-tb_1920-r_16_9-s_100.*\.jpg.*".*\/>.*<\/picture>/gs,
             );
+            assertNoPlaceholders(output);
           });
         });
       });
@@ -334,6 +354,7 @@ describe('Responsive image loader', () => {
 
         expect(output).toMatch(/type="image\/webp"/);
         expect(output).toMatch(/type="image\/jpeg"/);
+        assertNoPlaceholders(output);
       });
 
       it.todo(
@@ -352,6 +373,7 @@ describe('Responsive image loader', () => {
         expect(output).toMatch(
           /<picture.*>.*<source.*type="image\/webp".*srcset=".*\.webp.*".*\/>.*<source.*type="image\/jpeg".*srcset=".*\.jpg.*".*\/>.*<\/picture>/gs,
         );
+        assertNoPlaceholders(output);
       });
     });
 
@@ -365,6 +387,7 @@ describe('Responsive image loader', () => {
         expect(output).toMatch(
           /<img.*class="hello there general-kenobi".*\/>/gs,
         );
+        assertNoPlaceholders(output);
       });
 
       it('should apply all <img> classes to <picture>', async () => {
@@ -373,6 +396,7 @@ describe('Responsive image loader', () => {
         expect(output).toMatch(
           /<picture class="hello there general-kenobi">.*<img.*class="hello there general-kenobi".*\/>.*<\/picture>/gs,
         );
+        assertNoPlaceholders(output);
       });
 
       it('should apply provided classes to <picture> when responsive-picture-class is present', async () => {
@@ -381,6 +405,7 @@ describe('Responsive image loader', () => {
         expect(output).toMatch(
           /<picture class="general-kenobi">.*<img.*class="hello there".*\/>.*<\/picture>/gs,
         );
+        assertNoPlaceholders(output);
       });
 
       it('should not apply classes to <picture> when an empty responsive-picture-class is present', async () => {
@@ -391,6 +416,7 @@ describe('Responsive image loader', () => {
         expect(output).toMatch(
           /<picture class="">.*<img.*class="hello there".*\/>.*<\/picture>/gs,
         );
+        assertNoPlaceholders(output);
       });
 
       it('should apply provided classes to <img> when responsive-img-class is present', async () => {
@@ -399,6 +425,7 @@ describe('Responsive image loader', () => {
         expect(output).toMatch(
           /<picture class="hello there">.*<img.*class="general-kenobi".*\/>.*<\/picture>/gs,
         );
+        assertNoPlaceholders(output);
       });
 
       it('should not apply classes to <img> when an empty responsive-img-class is present', async () => {
@@ -409,6 +436,7 @@ describe('Responsive image loader', () => {
         expect(output).toMatch(
           /<picture class="hello there">.*<img.*class="".*\/>.*<\/picture>/gs,
         );
+        assertNoPlaceholders(output);
       });
     });
   });
@@ -420,6 +448,7 @@ describe('Responsive image loader', () => {
       expect(output).toMatch(
         /<div.*data-responsive-bg>.*<picture.*>.*<img.*\/>.*<\/picture>.*<h1>Hello there!<\/h1>.*<\/div>/gs,
       );
+      assertNoPlaceholders(output);
     });
   });
 });

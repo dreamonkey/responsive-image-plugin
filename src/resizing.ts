@@ -1,9 +1,18 @@
-import { existsSync, statSync, writeFileSync } from 'fs';
+import sizeOf from 'image-size';
 import { isNull, isUndefined, map, times } from 'lodash';
-import { format, join, parse } from 'path';
-import { Breakpoint, generateUri, getTempImagesDir, SizesMap } from './base';
-import { ResponsiveImageLoaderContext } from './config';
-import { deepFreeze, selectFromPreset } from './helpers';
+import { format, parse } from 'path';
+import {
+  Breakpoint,
+  generateUri,
+  getTempImagesDir,
+  pluginContext,
+  SizesMap,
+} from './base';
+import {
+  convertRatioStringToNumber,
+  deepFreeze,
+  selectFromPreset,
+} from './helpers';
 import { ResponsiveImage } from './parsing';
 import { ResizingAdapter, ResizingAdapterPresets } from './resizers/resizers';
 import { sharpResizer } from './resizers/sharp';
@@ -12,21 +21,6 @@ import {
   isTransformationSource,
   TransformationSource,
 } from './transformation';
-
-const DUMMY_IMAGE_PATH = 'dummy-image.gif';
-// Taken from http://png-pixel.com/
-const DUMMY_IMAGE_BASE64_DATA = Buffer.from(
-  'R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==',
-  'base64',
-);
-
-function getEmptyImagePath(): string {
-  const path = join(getTempImagesDir(), DUMMY_IMAGE_PATH);
-  if (!existsSync(path)) {
-    writeFileSync(path, DUMMY_IMAGE_BASE64_DATA);
-  }
-  return path;
-}
 
 type ResizingAdapterPresetsMap = {
   [index in ResizingAdapterPresets]: ResizingAdapter;
@@ -51,6 +45,7 @@ interface ResizingIntervalDelimiter {
   //  and breakpoints calculation depends by the image size in that interval,
   //  which is the size of the upper end delimiter
   size: number;
+  ratio: number;
   viewport: number;
 }
 
@@ -66,14 +61,20 @@ interface ResizingInterval {
 
 export const generateResizingUri = (
   path: string,
-  content: Buffer,
   breakpoint: number,
 ): ReturnType<typeof generateUri> =>
   // 'b' stands for 'breakpoint'
-  generateUri(path, content, () => `-b_${breakpoint}`);
+  generateUri(path, () => `-b_${breakpoint}`);
 
 export function byIncreasingWidth(a: Breakpoint, b: Breakpoint): number {
   return a.width - b.width;
+}
+
+function getImgRatio(path: string): number {
+  const { height, width } = sizeOf(path);
+
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return height! / width!;
 }
 
 function generateIntervalDelimiters(
@@ -85,9 +86,10 @@ function generateIntervalDelimiters(
 ): ResizingIntervalDelimiter[] {
   const delimiters: ResizingIntervalDelimiter[] = sources
     .sort(byIncreasingMaxViewport)
-    .map(({ path, maxViewport, size }) => ({
+    .map(({ path, maxViewport, ratio, size }) => ({
       path,
       size,
+      ratio: convertRatioStringToNumber(ratio),
       viewport: maxViewport,
     }));
 
@@ -111,9 +113,10 @@ function generateIntervalDelimiters(
     ...(!isUndefined(firstDelimiterAfterMinViewport)
       ? firstDelimiterAfterMinViewport
       : {
-          // We need minDelimiter image size to be 0 when checked later on,
-          //  so we provide a path to an empty image
-          path: getEmptyImagePath(),
+          path: 'dummy-path',
+          // We need minDelimiter estimated image size to be 0 when checked later on,
+          //  so we provide a ratio of 0, which will result into a size of 0 bytes
+          ratio: 0,
           size: sizes[`${maxViewport}`] ?? sizes.__default,
         }),
     viewport: minViewport,
@@ -125,6 +128,7 @@ function generateIntervalDelimiters(
       : {
           path: originalPath,
           size: sizes[`${maxViewport}`] ?? sizes.__default,
+          ratio: getImgRatio(originalPath),
         }),
     viewport: maxViewport,
   };
@@ -183,15 +187,36 @@ function generateIntervals(
   return intervals;
 }
 
-async function generateBreakpoints(
-  this: ResponsiveImageLoaderContext,
-  resizer: ResizingAdapter,
+function toKb(size: number): number {
+  return size / 1024;
+}
+
+function estimateSize(width: number, ratio: number): number {
+  const height = Math.ceil(width * ratio);
+  return height * width;
+}
+
+function estimateSizeOfBreakpointOrDelimiter(
+  breakpointOrDelimiter: ResizingIntervalDelimiterWithScaledWidth | Breakpoint,
+  defaultRatio: number,
+): number {
+  const ratio =
+    (breakpointOrDelimiter as ResizingIntervalDelimiterWithScaledWidth).ratio ??
+    defaultRatio;
+
+  // TODO: take into consideration the original format and enabled conversion formats to better estimate the final size
+  // TODO: WebP is at least 25% more compression-efficient than JPG: https://developers.google.com/speed/webp/docs/webp_study
+  // Breakpoints/delimiter haven't been generated yet, but we can estimate their size
+  return estimateSize(breakpointOrDelimiter.width, ratio);
+}
+
+function generateBreakpoints(
   minStepSize: number,
   currentInterval: ResizingInterval,
   nextInterval: ResizingInterval | undefined,
-): Promise<Breakpoint[]> {
+): Breakpoint[] {
   let breakpoints: Breakpoint[];
-  let allStepsAreWideEnough: boolean;
+  let areAllStepsWideEnough: boolean;
 
   do {
     const { breakpointsCount, startDelimiter, endDelimiter } = currentInterval;
@@ -203,30 +228,33 @@ async function generateBreakpoints(
       (index) => startDelimiter.width + breakpointUnit * (index + 1),
     );
 
-    breakpoints = await Promise.all(
-      breakpointViewports.map((breakpoint) =>
-        resizer.call(
-          this,
-          endDelimiter.path,
-          format({
-            dir: getTempImagesDir(),
-            base: parse(endDelimiter.path).base,
-          }),
-          breakpoint,
-        ),
-      ),
-    );
+    breakpoints = breakpointViewports.map((breakpoint) => {
+      const uri = generateResizingUri(endDelimiter.path, breakpoint);
+
+      const destinationPath = format({
+        dir: getTempImagesDir(),
+        base: parse(uri).base,
+      });
+
+      return { path: destinationPath, uri, width: breakpoint };
+    });
 
     const imagesSizes = [startDelimiter, ...breakpoints, endDelimiter].map(
-      (breakpointOrDelimiter) => statSync(breakpointOrDelimiter.path).size,
+      (breakpointOrDelimiter) =>
+        toKb(
+          estimateSizeOfBreakpointOrDelimiter(
+            breakpointOrDelimiter,
+            endDelimiter.ratio,
+          ),
+        ),
     );
 
-    allStepsAreWideEnough = true;
+    areAllStepsWideEnough = true;
 
     for (let index = 1; index < imagesSizes.length; index++) {
       const previousSize = imagesSizes[index - 1];
       const currentSize = imagesSizes[index];
-      if (currentSize - previousSize < minStepSize * 1000) {
+      if (currentSize - previousSize < minStepSize) {
         // Difference in sizes between breakpoints are too narrow
         // We bubble up the breakpoint to next interval range, if there is one,
         //  or just drop it, if current interval is the last one
@@ -235,18 +263,24 @@ async function generateBreakpoints(
           nextInterval.breakpointsCount++;
         }
 
-        allStepsAreWideEnough = false;
+        areAllStepsWideEnough = false;
         break;
       }
     }
-  } while (currentInterval.breakpointsCount !== 0 && !allStepsAreWideEnough);
+  } while (currentInterval.breakpointsCount !== 0 && !areAllStepsWideEnough);
 
   return breakpoints;
 }
 
+export const pendingResizes: [
+  sourceImagePath: string,
+  breakpoint: Breakpoint,
+  uri: string,
+][] = [];
+
 /*
   Breakpoints generation adds as many breakpoints as possible
-    into narrow viewports (smartphones), which suffer high budle
+    into narrow viewports (smartphones), which suffer high bundle
     sizes the most (eg. when using data network);
     it also grants some breakpoints to wider viewports (laptops, desktops),
     where is less critical to save bandwidth.
@@ -254,28 +288,17 @@ async function generateBreakpoints(
     for them, those breakpoints are re-allocated to wider viewports
     and removed when they cannot be used in the widest viewport available.
 */
-export async function resizeImage(
-  this: ResponsiveImageLoaderContext,
-  image: ResponsiveImage,
-  {
+export function applyResizes(image: ResponsiveImage): void {
+  const {
     resizer,
     minViewport,
     maxViewport,
     maxBreakpointsCount,
     minSizeDifference,
-  }: ResizingConfig,
-): Promise<ResponsiveImage> {
-  if (typeof resizer === 'string') {
-    try {
-      resizer = selectFromPreset(presetResizers, resizer);
-    } catch (e) {
-      this.emitError(e as Error);
-      resizer = null;
-    }
-  }
+  } = pluginContext.options.resolutionSwitching;
 
   if (isNull(resizer)) {
-    return Promise.resolve(image);
+    return;
   }
 
   const artDirectionSources = image.sources.filter((source) =>
@@ -306,21 +329,17 @@ export async function resizeImage(
       continue;
     }
 
+    const { width, ratio } = currentInterval.endDelimiter;
     // If the size of the source image for this interval is less
     //  than 2 times the minimum size difference we know no breakpoints can be put here.
     // We add its breakpointsCount to the next interval (if any) and move on
-    if (
-      statSync(currentInterval.endDelimiter.path).size <
-      minSizeDifference * 1000 * 2
-    ) {
+    if (toKb(estimateSize(width, ratio)) < minSizeDifference * 2) {
       nextInterval &&
         (nextInterval.breakpointsCount += currentInterval.breakpointsCount);
       continue;
     }
 
-    const breakpoints = await generateBreakpoints.call(
-      this,
-      resizer,
+    const breakpoints = generateBreakpoints(
       minSizeDifference,
       currentInterval,
       nextInterval,
@@ -332,21 +351,33 @@ export async function resizeImage(
       let intervalSource = viewportToSourceMap.get(endViewport);
 
       if (isUndefined(intervalSource)) {
-        const fallbackSource = {
+        const fallbackSource: TransformationSource = {
           breakpoints: [],
           maxViewport: endViewport,
           path: image.originalPath,
+          ratio: 'original',
           size: image.options.sizes.__default,
+          isCustom: false,
         };
         viewportToSourceMap.set(endViewport, fallbackSource);
         intervalSource = fallbackSource;
       }
 
       intervalSource.breakpoints.push(...breakpoints);
+
+      for (const breakpoint of breakpoints) {
+        pendingResizes.push([intervalSource.path, breakpoint, breakpoint.uri]);
+      }
     }
   }
 
   image.sources = Array.from(viewportToSourceMap.values());
+}
 
-  return image;
+export function resolveResizer(resizer: ResizingConfig['resizer']) {
+  if (typeof resizer === 'string') {
+    resizer = selectFromPreset(presetResizers, resizer);
+  }
+
+  return resizer;
 }

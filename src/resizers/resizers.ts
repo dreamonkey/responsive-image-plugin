@@ -1,11 +1,7 @@
-import { ResponsiveImageLoaderContext } from '../config';
-import { Breakpoint } from '../base';
+import { BaseAdapter, Breakpoint } from '../base';
 
-export type ResizingAdapter = (
-  this: ResponsiveImageLoaderContext,
-  sourcePath: string,
-  destinationPath: string,
-  breakpointWindth: number,
-) => Promise<Breakpoint>;
+export type ResizingAdapter = BaseAdapter<
+  [sourcePath: string, breakpoint: Breakpoint]
+>;
 
 export type ResizingAdapterPresets = 'sharp';

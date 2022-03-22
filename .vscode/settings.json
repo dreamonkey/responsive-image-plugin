@@ -2,5 +2,9 @@
   "editor.formatOnSave": true,
   "editor.formatOnPaste": true,
   "eslint.validate": ["javascript", "javascriptreact", "typescript"],
-  "typescript.tsdk": "node_modules/typescript/lib"
+  "typescript.tsdk": "node_modules/typescript/lib",
+  // Note we're not using webpack to process the whole package code,
+  // so we cannot use absolute paths as TSC won't replace them with relative ones
+  // in the final build and cause errors due to wrong file resolution when used into a package
+  "typescript.preferences.importModuleSpecifier": "relative"
 }
