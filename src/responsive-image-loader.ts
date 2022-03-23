@@ -1,7 +1,7 @@
 import { DeepPartial } from 'ts-essentials';
 import { LoaderDefinitionFunction } from 'webpack';
 import { ResponsiveImagePluginConfig } from './config';
-import { ConversionResponsiveImage, applyConversions } from './conversion';
+import { applyConversions, ConversionResponsiveImage } from './conversion';
 import { enhance, parse } from './parsing';
 import { applyResizes } from './resizing';
 import { applyTransformations } from './transformation';

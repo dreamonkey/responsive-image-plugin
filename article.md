@@ -61,7 +61,8 @@ html-loader converts an html file to a JS module, converting which imports the a
 It should be possible using https://webpack.js.org/loaders/html-loader/#export-into-html-files
 But I haven't tried it
 
-Updating the source via private properties seem to work in simple cases (`module._source._value`), but breaks on more complex ones. It's a dirty hack anyway
+Updating the source via private properties seem to work in simple cases (`module._source._value`), but breaks on more complex ones. It's a dirty hack anyway.
+`module.source(compilation.dependencyTemplates,compilation.runtimeTemplate).source()` is deprecated and doesn't seem to work anymore
 
 It's possible to register a loader automatically via a plugin using `compiler.options.module.rules.push(loaderConfig)`
 We didn't do that as our plugin may target Vue files too. We could either add support both for html and vue, or just leave it to the user. Not sure which to choose
@@ -69,6 +70,8 @@ We didn't do that as our plugin may target Vue files too. We could either add su
 The best way to update the source code of a module is to execute the loader a first time doing nothing (or doing intermediate processing), do your stuff into the plugin, then trigger a `rebuildModule` on the modules which must be updated into `finishModules`, `seal` or `optimizeModules` hooks. The latter 2 are guaranteed to have all compilation context loaded, thus they may be useful. The loader will be executed again (together with all other loaders on the same module I guess) and you can then finish processing the file with the new data provided by the plugin (stored into a shared ESM module export, into `this._compilation` or `this._module`).
 Note that triggering `rebuildModule` is probably pretty inefficient and could cause performance loss.
 See https://github.com/webpack/webpack/issues/8830#issuecomment-580095801
+A problem with this way is that you then need to WAIT for the `rebuildModule` to finish, and it isn't promise-like by default.
+If you don't wait, compilation will go on and changes to rebuild modules will be lost or, worse, cause some kind of undebuggable mismatch.
 
 We managed to find a way to estimate the file size by width and height, or width and ratio
 See https://pixelcalculator.com/en
@@ -122,6 +125,10 @@ Why wasn't `this._compiler.resolverFactory.get('normal').resolveSync({}, loaderC
 How do this stuff interact with the cache system? The cache is accessible via `compiler.cache` and similar properties.
 
 We can enhance reporting for each step, eg. with https://webpack.js.org/api/plugins/#reporting-progress
+
+How do `compilation.codeGenerationResults.getSource()` work? Can it be used to avoid rebuilding the whole module? What's the correct way to access a module source?
+
+`module.getSourceTypes().has('javascript')` is this the correct way to filter out all modules without an actual source?
 
 ## Breaking changes/migration
 

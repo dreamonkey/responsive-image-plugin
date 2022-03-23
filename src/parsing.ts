@@ -8,6 +8,7 @@ import {
   pluginContext,
   resolveViewportAliases,
   SizesMap,
+  urlReplaceMap,
 } from './base';
 import { ResponsiveImageLoaderContext } from './config';
 import { byMostEfficientFormat, ConversionResponsiveImage } from './conversion';
@@ -301,14 +302,24 @@ export function parse(
   return { sourceWithPlaceholders: source, parsedImages: responsiveImages };
 }
 
+// If we have entries in the map, we already generated images and we're now rebuilding modules,
+// so all URIs will have their hashed version
+function getHashedUriOrPlaceholder(uri: string) {
+  if (Object.keys(urlReplaceMap).length === 0) {
+    return generateUrlPlaceholder(uri);
+  }
+
+  return urlReplaceMap[uri];
+}
+
 function generateSrcSet(breakpoints: Breakpoint[]): string {
   if (breakpoints.length === 1) {
-    return generateUrlPlaceholder(breakpoints[0].uri);
+    return getHashedUriOrPlaceholder(breakpoints[0].uri);
   }
 
   return breakpoints
     .sort(byIncreasingWidth)
-    .map(({ uri, width }) => `${generateUrlPlaceholder(uri)} ${width}w`)
+    .map(({ uri, width }) => `${getHashedUriOrPlaceholder(uri)} ${width}w`)
     .join(', ');
 }
 

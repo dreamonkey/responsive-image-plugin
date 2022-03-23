@@ -2,8 +2,13 @@ import { writeFile } from 'fs-extra';
 import { isNull, merge } from 'lodash';
 import { validate } from 'schema-utils';
 import { DeepPartial } from 'ts-essentials';
-import { Compilation, Compiler, sources } from 'webpack';
-import { AliasOption, guardAgainstDefaultAlias, pluginContext } from './base';
+import { Compilation, Compiler, Module, sources } from 'webpack';
+import {
+  AliasOption,
+  guardAgainstDefaultAlias,
+  pluginContext,
+  urlReplaceMap,
+} from './base';
 import { OPTIONS_SCHEMA, ResponsiveImagePluginConfig } from './config';
 import {
   guardAgainstUnsupportedSourceType,
@@ -13,7 +18,7 @@ import {
 import { ConversionAdapter } from './converters/converters';
 import { DEFAULT_OPTIONS } from './defaults';
 import { addHashToUri } from './helpers';
-// import { generateUrlPlaceholder, URL_PLACEHOLDER_PATTERN } from './parsing';
+import { URL_PLACEHOLDER_PATTERN } from './parsing';
 import { ResizingAdapter } from './resizers/resizers';
 import { pendingResizes, resolveResizer } from './resizing';
 import { pendingTransformations, resolveTransformer } from './transformation';
@@ -22,10 +27,18 @@ import { WebpackLogger } from './webpack-logger';
 
 const { RawSource } = sources;
 
+// From https://github.com/cyrilfretlink/try-purescript-react-basic/blob/e7bc08f83e72b6dee99ec18fab332223492d6aca/purs-css-modules-webpack-plugin/src/index.js#L43-L65
+const rebuildModule = (compilation: Compilation, module: Module) =>
+  new Promise<void>((resolve, reject) => {
+    compilation.rebuildModule(module, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+
 class ResponsiveImagePlugin {
   private pluginName = ResponsiveImagePlugin.name;
   private options: ResponsiveImagePluginConfig;
-  private urlReplaceMap: Record<string, string> = {};
 
   private logger!: WebpackLogger;
 
@@ -55,58 +68,6 @@ class ResponsiveImagePlugin {
     pluginContext.options = this.options;
   }
 
-  // private replaceUrls(modules: Iterable<Module>) {
-  //   let gg = 0;
-  //   for (const module of modules) {
-  //     // console.log(module);
-  //     // module.originalSource()
-  //     // module.source()
-
-  //     /*
-  //             eslint-disable-next-line
-  //             @typescript-eslint/no-unsafe-member-access,
-  //             @typescript-eslint/no-explicit-any
-  //           */
-  //     if (!(module as any)._source) {
-  //       continue;
-  //     }
-
-  //     /*
-  //             eslint-disable-next-line
-  //             @typescript-eslint/no-unsafe-assignment,
-  //             @typescript-eslint/no-unsafe-member-access,
-  //             @typescript-eslint/no-explicit-any
-  //           */
-  //     let source: string = (module as any)._source._value;
-
-  //     if (!URL_PLACEHOLDER_PATTERN.exec(source)) {
-  //       continue;
-  //     }
-
-  //     if (gg === 0) {
-  //       console.log(source);
-  //     }
-
-  //     // TODO: do this with a single replace step
-  //     // See https://stackoverflow.com/a/15604206
-  //     for (const [originalUrl, urlWithHash] of Object.entries(
-  //       this.urlReplaceMap,
-  //     )) {
-  //       source = source.replace(
-  //         generateUrlPlaceholder(originalUrl),
-  //         urlWithHash,
-  //       );
-  //     }
-
-  //     /*
-  //             eslint-disable-next-line
-  //             @typescript-eslint/no-unsafe-member-access,
-  //             @typescript-eslint/no-explicit-any
-  //           */
-  //     (module as any)._source._value = source;
-  //   }
-  // }
-
   // Art direction: apply ratio transformations
   private async transformImages(compilation: Compilation) {
     const logger = this.logger.getChildLogger('Art Direction');
@@ -116,7 +77,12 @@ class ResponsiveImagePlugin {
       return;
     }
 
-    logger.info('Initializing step...');
+    if (pendingTransformations.length === 0) {
+      logger.info('No transformations to process, skipping...');
+      return;
+    }
+
+    logger.info('Initializing...');
 
     await this.transformer.setup?.();
 
@@ -133,7 +99,7 @@ class ResponsiveImagePlugin {
 
             const uriWithHash = addHashToUri(uri, transformedImage);
 
-            this.urlReplaceMap[uri] = uriWithHash;
+            urlReplaceMap[uri] = uriWithHash;
 
             // TODO: does this add the files/assets to the cache?
             compilation.emitAsset(uriWithHash, new RawSource(transformedImage));
@@ -147,8 +113,8 @@ class ResponsiveImagePlugin {
 
     await this.transformer.teardown?.();
 
-    logger.info('Step completed!');
-    logger.info();
+    logger.info('Completed!');
+    logger.info('===============');
   }
 
   // Resolution switching: get resized image versions for multiple viewports
@@ -160,7 +126,12 @@ class ResponsiveImagePlugin {
       return;
     }
 
-    logger.info('Initializing step...');
+    if (pendingResizes.length === 0) {
+      logger.info('No resizes to process, skipping...');
+      return;
+    }
+
+    logger.info('Initializing...');
 
     await this.resizer.setup?.();
 
@@ -173,7 +144,7 @@ class ResponsiveImagePlugin {
 
           const uriWithHash = addHashToUri(uri, resizedImage);
 
-          this.urlReplaceMap[uri] = uriWithHash;
+          urlReplaceMap[uri] = uriWithHash;
 
           // TODO: does this add the files/assets to the cache?
           compilation.emitAsset(uriWithHash, new RawSource(resizedImage));
@@ -186,8 +157,8 @@ class ResponsiveImagePlugin {
 
     await this.resizer.teardown?.();
 
-    logger.info('Step completed!');
-    logger.info();
+    logger.info('Completed!');
+    logger.info('===============');
   }
 
   // Conversion: convert images to more compression efficient formats and fallback formats
@@ -199,7 +170,12 @@ class ResponsiveImagePlugin {
       return;
     }
 
-    logger.info('Initializing step...');
+    if (pendingConversions.length === 0) {
+      logger.info('No conversions to process, skipping...');
+      return;
+    }
+
+    logger.info('Initializing...');
 
     await this.converter.setup?.();
 
@@ -214,7 +190,7 @@ class ResponsiveImagePlugin {
 
           const uriWithHash = addHashToUri(uri, convertedImage);
 
-          this.urlReplaceMap[uri] = uriWithHash;
+          urlReplaceMap[uri] = uriWithHash;
 
           // TODO: does this add the files/assets to the cache?
           compilation.emitAsset(uriWithHash, new RawSource(convertedImage));
@@ -226,8 +202,8 @@ class ResponsiveImagePlugin {
 
     await this.converter.teardown?.();
 
-    logger.info('Step completed!');
-    logger.info();
+    logger.info('Completed!');
+    logger.info('===============');
   }
 
   apply(compiler: Compiler) {
@@ -244,15 +220,40 @@ class ResponsiveImagePlugin {
       });
 
     compiler.hooks.thisCompilation.tap(this.pluginName, (compilation) => {
-      // compilation.hooks.optimizeModules.tap(this.pluginName, (modules) => {
-      //   this.replaceUrls(modules);
-      // });
-      compilation.hooks.finishModules.tapPromise(this.pluginName, async () => {
-        await this.transformImages(compilation);
-        await this.resizeImages(compilation);
-        await this.convertImages(compilation);
-        // this.replaceUrls(modules);
-      });
+      compilation.hooks.finishModules.tapPromise(
+        this.pluginName,
+        async (modules) => {
+          await this.transformImages(compilation);
+          await this.resizeImages(compilation);
+          await this.convertImages(compilation);
+
+          const modulesToRebuild: Module[] = [];
+
+          for (const module of modules) {
+            // TODO: Is this the correct way to check this?
+            // Modules with type different than javascript may not have a source
+            if (!module.getSourceTypes().has('javascript')) {
+              continue;
+            }
+
+            // TODO: which would be the correct way of accessing this source?
+            /* eslint-disable-next-line */
+            const source: string = (module as any)._source._value;
+
+            if (!URL_PLACEHOLDER_PATTERN.exec(source)) {
+              continue;
+            }
+
+            modulesToRebuild.push(module);
+          }
+
+          await Promise.all(
+            modulesToRebuild.map((module) =>
+              rebuildModule(compilation, module),
+            ),
+          );
+        },
+      );
     });
   }
 }

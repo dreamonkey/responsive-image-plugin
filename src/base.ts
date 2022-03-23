@@ -36,6 +36,8 @@ let _logger: WebpackLogger | undefined;
 let _resolveAliases: AliasOption[] = [];
 let _options: ResponsiveImagePluginConfig | undefined;
 
+export const urlReplaceMap: Record<string, string> = {};
+
 export const pluginContext = {
   get logger(): WebpackLogger {
     if (isUndefined(_logger)) {
