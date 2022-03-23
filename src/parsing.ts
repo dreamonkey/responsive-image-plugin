@@ -70,8 +70,13 @@ const ART_DIRECTION_IGNORE_ATTRIBUTE_PATTERN =
 
 const imagesMatchesMap: { [index: string]: string } = {};
 
-// TODO: should we automatically resolve '~' => 'src/', to solve Quasar special case?
 function resolvePathAliases(imagePath: string): string | undefined {
+  // TODO: manage Quasar special case for assets, which require a tilde in front of them
+  // no idea how we could fix this otherwise
+  if (imagePath.startsWith('~')) {
+    imagePath = imagePath.substring(1);
+  }
+
   for (const { name, alias } of pluginContext.resolveAliases) {
     if (imagePath.startsWith(name)) {
       return imagePath.replace(name, alias);

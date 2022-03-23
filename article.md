@@ -72,6 +72,7 @@ Note that triggering `rebuildModule` is probably pretty inefficient and could ca
 See https://github.com/webpack/webpack/issues/8830#issuecomment-580095801
 A problem with this way is that you then need to WAIT for the `rebuildModule` to finish, and it isn't promise-like by default.
 If you don't wait, compilation will go on and changes to rebuild modules will be lost or, worse, cause some kind of undebuggable mismatch.
+At `finishModules` stage, `module.getSourceTypes().has('javascript')` and `!!(module as any)._source._value` are the same, but later on (eg. at `done` stage) this isn't true anymore
 
 We managed to find a way to estimate the file size by width and height, or width and ratio
 See https://pixelcalculator.com/en
