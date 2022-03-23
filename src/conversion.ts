@@ -94,7 +94,7 @@ function generateFallbackSource(
 ): ConversionSource {
   const { name } = parse(sourcePath);
   const uri = generateConversionUri(
-    join(pluginContext.options.paths.outputDir, `${name}.${format}`),
+    join(pluginContext.options.outputDir, `${name}.${format}`),
   );
 
   pendingConversions.push([sourcePath, format, uri]);

@@ -9,11 +9,7 @@ import { applyTransformations } from './transformation';
 const loader: LoaderDefinitionFunction<
   DeepPartial<ResponsiveImagePluginConfig>
 > = function (source) {
-  const { sourceWithPlaceholders, parsedImages } = parse(
-    this.context,
-    this.rootContext,
-    source,
-  );
+  const { sourceWithPlaceholders, parsedImages } = parse(this, source);
 
   if (parsedImages.length === 0) {
     return source;
@@ -25,9 +21,7 @@ const loader: LoaderDefinitionFunction<
     this.addDependency(responsiveImage.originalPath),
   );
 
-  parsedImages.forEach((image) =>
-    applyTransformations(this.rootContext, this.context, image),
-  );
+  parsedImages.forEach((image) => applyTransformations(this, image));
   parsedImages.forEach(applyResizes);
   parsedImages.map(applyConversions);
 

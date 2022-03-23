@@ -15,22 +15,25 @@ export interface BaseAdapter<Params extends unknown[]> {
   teardown?: () => void | Promise<void>;
 }
 
+// Slightly different than webpack version, as we filter out entries with `onlyModule` set to true
+// and those with an array or false alias value
+export interface AliasOption {
+  alias: string;
+  name: string;
+}
+
 export interface ViewportAliasesMap {
   [index: string]: string;
 }
 
-interface PathsConfig {
-  outputDir: string;
-  aliases: Dictionary<string>;
-}
-
 export interface BaseConfig {
-  paths: PathsConfig;
+  outputDir: string;
   viewportAliases: ViewportAliasesMap;
   defaultSize: number;
 }
 
 let _logger: WebpackLogger | undefined;
+let _resolveAliases: AliasOption[] = [];
 let _options: ResponsiveImagePluginConfig | undefined;
 
 export const pluginContext = {
@@ -54,28 +57,33 @@ export const pluginContext = {
     _options = o;
   },
 
-  get pathAliases(): [string, string][] {
-    if (isUndefined(_options)) {
-      throw new Error('Options has not been initialized properly');
+  get resolveAliases(): AliasOption[] {
+    if (isUndefined(_resolveAliases)) {
+      throw new Error('Resolve aliases has not been initialized properly');
     }
-    return Object.entries(_options.paths.aliases);
+    return _resolveAliases;
+  },
+  set resolveAliases(a: AliasOption[]) {
+    _resolveAliases = a;
   },
 };
 
-function resolveAlias(
+function resolveViewportAlias(
   viewportName: string,
-  aliases: ViewportAliasesMap,
+  viewportAliases: ViewportAliasesMap,
 ): string {
-  return isUndefined(aliases[viewportName])
+  return isUndefined(viewportAliases[viewportName])
     ? viewportName
-    : aliases[viewportName];
+    : viewportAliases[viewportName];
 }
 
-export function resolveAliases<T>(
+export function resolveViewportAliases<T>(
   viewportMap: Dictionary<T>,
-  aliases: ViewportAliasesMap,
+  viewportAliases: ViewportAliasesMap,
 ): Dictionary<T> {
-  return mapKeys(viewportMap, (_, name) => resolveAlias(name, aliases));
+  return mapKeys(viewportMap, (_, name) =>
+    resolveViewportAlias(name, viewportAliases),
+  );
 }
 
 export function guardAgainstDefaultAlias(
@@ -142,7 +150,7 @@ export function generateUri(
 ): string {
   const { name: filename, ext: extension } = parse(path);
   // The URI is a relative URL, and as such must always use posix style separators ("/")
-  const uriStart = posixJoin(pluginContext.options.paths.outputDir, filename);
+  const uriStart = posixJoin(pluginContext.options.outputDir, filename);
   const uriBody = uriBodyGenerator();
 
   return uriStart + uriBody + extension;

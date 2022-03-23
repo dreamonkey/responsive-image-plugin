@@ -130,15 +130,8 @@ webpackConf.module.rules.push({
   resourceQuery: /type=template/,
   loader: '@dreamonkey/responsive-image-loader',
   options: {
-    paths: {
-      /* Quasar output folder */
-      outputDir: '/img/',
-      /* Quasar webpack aliases */
-      aliases: {
-        '~': 'src/',
-        /* ... */
-      },
-    },
+    /* Quasar output folder */
+    outputDir: '/img/',
     /* ... */
   },
 });
@@ -155,6 +148,10 @@ webpackConf.entry['responsive-bg-image-handler'] =
 ```
 
 You don't need to manually include it via a `script` tag as Quasar already does it automatically for every `entry` property.
+
+#### Verbose logs
+
+Set `webpackConfig.infrastructureLogging = { level: 'log' }` to see resources processing logs in real-time.
 
 ### <span id="engines"></span> Engines
 
@@ -328,17 +325,11 @@ You can check out the default configuration [here](defaults.ts).
 ```typescript
 // Full configuration, you won't ever need all this options
 const fullOptionsExample: ResponsiveImagePluginConfig = {
+  outputDir: '/images/',
   defaultSize: 1.0,
   viewportAliases: {
     xs: '699', // 0-699
     md: '1439', // 700-1439
-  },
-  paths: {
-    outputDir: '/images/',
-    aliases: {
-      '@randomjapp': 'src',
-      /* ... */
-    },
   },
   conversion: {
     converter: 'sharp',
@@ -368,18 +359,13 @@ const fullOptionsExample: ResponsiveImagePluginConfig = {
 
 // Example of a typical configuration, if using art direction
 const options: DeepPartial<ResponsiveImagePluginConfig> = {
+  outputDir: '/img/',
   viewportAliases: {
     xs: '699', // 0-699
     sm: '1023', // 700-1023
     md: '1439', // 1024-1439
     lg: '1919', // 1440-1919
     xl: '3400', // 1920-3400
-  },
-  paths: {
-    outputDir: '/img/',
-    aliases: {
-      '~': 'src/',
-    },
   },
   artDirection: {
     transformer: 'thumbor',
@@ -429,17 +415,6 @@ Your production bundle probably isn't organized with a flat folder structure, so
 ```typescript
 // All images will be emitted into the bundle `img` folder
 const opt = { outputDir: '/img/' };
-```
-
-#### `aliases` (default: {})
-
-Specify a map of aliases which is used to correctly resolve source image paths. Most of the times this will match your webpack aliases map (we still don't know how to programmatically get those ones, we welcome PRs!).
-
-In case of multiple matches, the first one win.
-
-```typescript
-// Make `~` point to `src/` folder
-const opt = { aliases: { '~': 'src/' } };
 ```
 
 ### <span id="conversion"></span> Conversion

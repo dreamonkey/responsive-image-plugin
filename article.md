@@ -80,6 +80,17 @@ See https://github.com/nodejs/node/issues/22030
 
 We can wait the promisified `exec` with `docker container stop xxx` to be sure the container actually died.
 
+Since we moved to a plugin, options can now be typechecked and intellisense works there.
+
+There are multiple "resolvers" into webpack, which are created using "enhanced-resolve": https://webpack.js.org/api/resolvers/
+You can access webpack aliases from loaders using `this._compiler.resolverFactory.get('normal').options.alias`, as resolvers are guaranteed to be initialized when loaders are run.
+The same doesn't hold true into plugin `apply`, as at that stage they aren't initialized, but you can access them tapping into resolverFactory hooks: `compiler.resolverFactory.hooks.resolver.for('normal').tap(this.pluginName, (resolver) => { /* ah-ah business */ });`
+
+Use `compiler.getInfrastructureLogger(this.pluginName)` into plugins to get a logger which prints directly in the console.
+`compilation.getLogger(this.pluginName)` (plugin) and `this.getLogger('loader-name')` (loader) log stuff into the internal stats webpack object and aren't printed at screen.
+You can change the logging level via `stats.logging` or `infrastructureLogging.level` into webpack config
+See https://github.com/webpack/webpack.js.org/issues/3205
+
 ## Future developments
 
 Study unplugin and try to make the plugin work with Vite too
@@ -106,10 +117,13 @@ Do `compilation.emitAsset` add the assets to the cache too?
 Is there a legit way to update source code from compilation, outside loaders?
 Relevant: https://stackoverflow.com/questions/35092183/webpack-plugin-how-can-i-modify-and-re-parse-a-module-after-compilation
 
-You can access webpack aliases from loaders, but how? Maybe `this.resolve` into loaders? Or maybe with https://github.com/webpack/enhanced-resolve , which is what webpack uses under the hood
-Into loader, `this._module.resolveOptions.alias` should be accessible too, but it may have many different shapes and parsing it could prove difficult. `resolveAlias` should be removed if we succeed in this.
+Why wasn't `this._compiler.resolverFactory.get('normal').resolveSync({}, loaderContext.context, imagePath)` working, not even firing the console.log?
 
 How do this stuff interact with the cache system? The cache is accessible via `compiler.cache` and similar properties.
 
-We should add some process reporting to make people know the compilation is still going even when it takes forever
-See https://webpack.js.org/api/plugins/#reporting-progress
+We can enhance reporting for each step, eg. with https://webpack.js.org/api/plugins/#reporting-progress
+
+## Breaking changes/migration
+
+Webpack aliases are automatically collected, `paths.aliases` has been removed and `paths.outputDir` has been moved one level up, now it's only `outputDir`
+Setup changed, options must be provided to the plugin now: TODO: add example

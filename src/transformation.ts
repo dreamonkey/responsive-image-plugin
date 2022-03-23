@@ -19,8 +19,9 @@ import {
   generateUri,
   getTempImagesDir,
   pluginContext,
-  resolveAliases,
+  resolveViewportAliases,
 } from './base';
+import { ResponsiveImageLoaderContext } from './config';
 import { deepFreeze, selectFromPreset } from './helpers';
 import { resolveImagePath, ResponsiveImage } from './parsing';
 import { thumborDockerTransformer } from './transformers/thumbor/thumbor';
@@ -196,8 +197,8 @@ export function normalizeTransformations(
 
   const transformations = merge(
     {},
-    resolveAliases(filteredDefaultTransformations, viewportAliases),
-    resolveAliases(inlineTransformations, viewportAliases),
+    resolveViewportAliases(filteredDefaultTransformations, viewportAliases),
+    resolveViewportAliases(inlineTransformations, viewportAliases),
   );
 
   const transformationNames = Object.keys(transformations);
@@ -265,8 +266,7 @@ export const pendingTransformations: [
 
 // Used by the loader
 export function applyTransformations(
-  rootContext: string,
-  context: string,
+  loaderContext: ResponsiveImageLoaderContext,
   image: ResponsiveImage,
 ): void {
   const { transformer } = pluginContext.options.artDirection;
@@ -285,8 +285,7 @@ export function applyTransformations(
   each(transformations, (transformation) => {
     if (isCustomTransformation(transformation)) {
       transformation.path = resolveImagePath(
-        rootContext,
-        context,
+        loaderContext,
         transformation.path,
       );
     }

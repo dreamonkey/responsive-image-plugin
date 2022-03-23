@@ -2,10 +2,7 @@ import { deepFreeze } from './helpers';
 import { ResponsiveImagePluginConfig } from './config';
 
 export const DEFAULT_OPTIONS = deepFreeze<ResponsiveImagePluginConfig>({
-  paths: {
-    outputDir: '/',
-    aliases: {},
-  },
+  outputDir: '/',
   defaultSize: 1.0,
   viewportAliases: {},
   conversion: {

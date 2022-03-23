@@ -29,17 +29,9 @@ export const OPTIONS_SCHEMA = deepFreeze<JSONSchema7>({
   title: 'Responsive image loader',
   type: 'object',
   properties: {
+    outputDir: { type: 'string' },
     defaultSize: { type: 'number' },
     viewportAliases: { type: 'object' },
-    paths: {
-      type: 'object',
-      properties: {
-        outputDir: { type: 'string' },
-        // TODO: add more adherent properties check if possible
-        aliases: { type: 'object' },
-      },
-      additionalProperties: false,
-    },
     conversion: {
       type: 'object',
       properties: {

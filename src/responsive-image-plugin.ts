@@ -3,7 +3,7 @@ import { isNull, merge } from 'lodash';
 import { validate } from 'schema-utils';
 import { DeepPartial } from 'ts-essentials';
 import { Compilation, Compiler, sources } from 'webpack';
-import { guardAgainstDefaultAlias, pluginContext } from './base';
+import { AliasOption, guardAgainstDefaultAlias, pluginContext } from './base';
 import { OPTIONS_SCHEMA, ResponsiveImagePluginConfig } from './config';
 import {
   guardAgainstUnsupportedSourceType,
@@ -18,6 +18,7 @@ import { ResizingAdapter } from './resizers/resizers';
 import { pendingResizes, resolveResizer } from './resizing';
 import { pendingTransformations, resolveTransformer } from './transformation';
 import { TransformationAdapter } from './transformers/transformers';
+import { WebpackLogger } from './webpack-logger';
 
 const { RawSource } = sources;
 
@@ -25,6 +26,8 @@ class ResponsiveImagePlugin {
   private pluginName = ResponsiveImagePlugin.name;
   private options: ResponsiveImagePluginConfig;
   private urlReplaceMap: Record<string, string> = {};
+
+  private logger!: WebpackLogger;
 
   private transformer: TransformationAdapter | null;
   private resizer: ResizingAdapter | null;
@@ -105,10 +108,15 @@ class ResponsiveImagePlugin {
   // }
 
   // Art direction: apply ratio transformations
-  async transformImages(compilation: Compilation) {
+  private async transformImages(compilation: Compilation) {
+    const logger = this.logger.getChildLogger('Art Direction');
+
     if (isNull(this.transformer)) {
+      logger.info('Null transformer provided, skipping...');
       return;
     }
+
+    logger.info('Initializing step...');
 
     await this.transformer.setup?.();
 
@@ -121,6 +129,7 @@ class ResponsiveImagePlugin {
               sourceImagePath,
               transformationSource,
             );
+            logger.log(`Generated: ${uri}`);
 
             const uriWithHash = addHashToUri(uri, transformedImage);
 
@@ -137,13 +146,21 @@ class ResponsiveImagePlugin {
     );
 
     await this.transformer.teardown?.();
+
+    logger.info('Step completed!');
+    logger.info();
   }
 
   // Resolution switching: get resized image versions for multiple viewports
   async resizeImages(compilation: Compilation) {
+    const logger = this.logger.getChildLogger('Resolution Switching');
+
     if (isNull(this.resizer)) {
+      logger.info('Null resizer provided, skipping...');
       return;
     }
+
+    logger.info('Initializing step...');
 
     await this.resizer.setup?.();
 
@@ -152,6 +169,7 @@ class ResponsiveImagePlugin {
         try {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           const resizedImage = await this.resizer!(sourceImagePath, breakpoint);
+          logger.log(`Generated: ${uri}`);
 
           const uriWithHash = addHashToUri(uri, resizedImage);
 
@@ -167,13 +185,21 @@ class ResponsiveImagePlugin {
     );
 
     await this.resizer.teardown?.();
+
+    logger.info('Step completed!');
+    logger.info();
   }
 
   // Conversion: convert images to more compression efficient formats and fallback formats
   async convertImages(compilation: Compilation) {
+    const logger = this.logger.getChildLogger('Conversion');
+
     if (isNull(this.converter)) {
+      logger.info('Null converter provided, skipping...');
       return;
     }
+
+    logger.info('Initializing step...');
 
     await this.converter.setup?.();
 
@@ -184,6 +210,7 @@ class ResponsiveImagePlugin {
 
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           const convertedImage = await this.converter!(sourceImagePath, format);
+          logger.log(`Generated: ${uri}`);
 
           const uriWithHash = addHashToUri(uri, convertedImage);
 
@@ -198,11 +225,23 @@ class ResponsiveImagePlugin {
     );
 
     await this.converter.teardown?.();
+
+    logger.info('Step completed!');
+    logger.info();
   }
 
   apply(compiler: Compiler) {
-    const logger = compiler.getInfrastructureLogger(this.pluginName);
-    pluginContext.logger = logger;
+    pluginContext.logger = this.logger = compiler.getInfrastructureLogger(
+      this.pluginName,
+    );
+
+    compiler.resolverFactory.hooks.resolver
+      .for('normal')
+      .tap(this.pluginName, (resolver) => {
+        pluginContext.resolveAliases = resolver.options.alias.filter(
+          ({ onlyModule, alias }) => !onlyModule && typeof alias === 'string',
+        ) as AliasOption[];
+      });
 
     compiler.hooks.thisCompilation.tap(this.pluginName, (compilation) => {
       // compilation.hooks.optimizeModules.tap(this.pluginName, (modules) => {

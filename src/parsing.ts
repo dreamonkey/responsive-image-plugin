@@ -6,9 +6,10 @@ import {
   BaseResponsiveImage,
   Breakpoint,
   pluginContext,
-  resolveAliases,
+  resolveViewportAliases,
   SizesMap,
 } from './base';
+import { ResponsiveImageLoaderContext } from './config';
 import { byMostEfficientFormat, ConversionResponsiveImage } from './conversion';
 import { byIncreasingWidth } from './resizing';
 import {
@@ -68,14 +69,11 @@ const ART_DIRECTION_IGNORE_ATTRIBUTE_PATTERN =
 
 const imagesMatchesMap: { [index: string]: string } = {};
 
-// Aliases are resolved relative to root level
-function resolvePathAliases(
-  rootContext: string,
-  imagePath: string,
-): string[] | undefined {
-  for (const [pathAlias, pathAliasValue] of pluginContext.pathAliases) {
-    if (imagePath.startsWith(pathAlias)) {
-      return [rootContext, pathAliasValue, imagePath.slice(pathAlias.length)];
+// TODO: should we automatically resolve '~' => 'src/', to solve Quasar special case?
+function resolvePathAliases(imagePath: string): string | undefined {
+  for (const { name, alias } of pluginContext.resolveAliases) {
+    if (imagePath.startsWith(name)) {
+      return imagePath.replace(name, alias);
     }
   }
 
@@ -133,9 +131,12 @@ function parseSizeProperty(
   // If no default size has been set via inline options, we add the global default size
   // We need to resolve aliases because sizes will be picked in multiple modules
   //   based on their resolved aliases name
-  const sizesWithoutAliases = defaults(resolveAliases(sizes, viewportAliases), {
-    __default: defaultSize,
-  });
+  const sizesWithoutAliases = defaults(
+    resolveViewportAliases(sizes, viewportAliases),
+    {
+      __default: defaultSize,
+    },
+  );
 
   return mapValues(
     sizesWithoutAliases as SizesMap,
@@ -148,14 +149,13 @@ function parseSizeProperty(
 
 // TODO: manage webpack aliases automatically
 export function resolveImagePath(
-  rootContext: string,
-  context: string,
+  loaderContext: ResponsiveImageLoaderContext,
   imagePath: string,
 ): string {
   // If no alias is found, we resolve it like a path relative to
   //  the processed file location
-  return resolve(
-    ...(resolvePathAliases(rootContext, imagePath) ?? [context, imagePath]),
+  return (
+    resolvePathAliases(imagePath) ?? resolve(loaderContext.context, imagePath)
   );
 }
 
@@ -232,8 +232,7 @@ function generateReplacingTag(
 }
 
 export function parse(
-  context: string,
-  rootContext: string,
+  loaderContext: ResponsiveImageLoaderContext,
   source: string,
 ): {
   sourceWithPlaceholders: string;
@@ -258,7 +257,7 @@ export function parse(
     const { tag, type } = tagDescriptor;
     const [, responsiveOptions, imagePath] = attributesMatches;
 
-    const resolvedPath = resolveImagePath(rootContext, context, imagePath);
+    const resolvedPath = resolveImagePath(loaderContext, imagePath);
 
     imagesMatchesMap[resolvedPath] =
       type === 'img-tag'
