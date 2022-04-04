@@ -5,14 +5,13 @@ import { Dictionary } from 'ts-essentials';
 import {
   BaseResponsiveImage,
   Breakpoint,
-  pluginContext,
   resolveViewportAliases,
   SizesMap,
-  urlReplaceMap,
 } from './base';
 import { ResponsiveImageLoaderContext } from './config';
 import { byMostEfficientFormat, ConversionResponsiveImage } from './conversion';
 import { byIncreasingWidth } from './resizing';
+import ResponsiveImagePlugin from './responsive-image-plugin';
 import {
   byIncreasingMaxViewport,
   decodeTransformation,
@@ -70,7 +69,10 @@ const ART_DIRECTION_IGNORE_ATTRIBUTE_PATTERN =
 
 const imagesMatchesMap: { [index: string]: string } = {};
 
-function resolvePathAliases(imagePath: string): string | undefined {
+function resolvePathAliases(
+  pluginContext: ResponsiveImagePlugin,
+  imagePath: string,
+): string | undefined {
   // TODO: manage Quasar special case for assets, which require a tilde in front of them
   // no idea how we could fix this otherwise
   if (imagePath.startsWith('~')) {
@@ -155,13 +157,15 @@ function parseSizeProperty(
 
 // TODO: manage webpack aliases automatically
 export function resolveImagePath(
+  pluginContext: ResponsiveImagePlugin,
   loaderContext: ResponsiveImageLoaderContext,
   imagePath: string,
 ): string {
   // If no alias is found, we resolve it like a path relative to
   //  the processed file location
   return (
-    resolvePathAliases(imagePath) ?? resolve(loaderContext.context, imagePath)
+    resolvePathAliases(pluginContext, imagePath) ??
+    resolve(loaderContext.context, imagePath)
   );
 }
 
@@ -238,6 +242,7 @@ function generateReplacingTag(
 }
 
 export function parse(
+  pluginContext: ResponsiveImagePlugin,
   loaderContext: ResponsiveImageLoaderContext,
   source: string,
 ): {
@@ -263,7 +268,11 @@ export function parse(
     const { tag, type } = tagDescriptor;
     const [, responsiveOptions, imagePath] = attributesMatches;
 
-    const resolvedPath = resolveImagePath(loaderContext, imagePath);
+    const resolvedPath = resolveImagePath(
+      pluginContext,
+      loaderContext,
+      imagePath,
+    );
 
     imagesMatchesMap[resolvedPath] =
       type === 'img-tag'
@@ -307,28 +316,35 @@ export function parse(
   return { sourceWithPlaceholders: source, parsedImages: responsiveImages };
 }
 
-// If we have entries in the map, we already generated images and we're now rebuilding modules,
-// so all URIs will have their hashed version
-function getHashedUriOrPlaceholder(uri: string) {
-  if (Object.keys(urlReplaceMap).length === 0) {
-    return generateUrlPlaceholder(uri);
-  }
-
-  return urlReplaceMap[uri];
+// If we don't have the entry in the map, we haven't generated images yet,
+// so we put a placeholder to mark this file as needed for a rebuild later on.
+// If we have it, it will be the URI hashed version
+function getHashedUriOrPlaceholder(
+  pluginContext: ResponsiveImagePlugin,
+  uri: string,
+) {
+  return pluginContext.urlReplaceMap[uri] ?? generateUrlPlaceholder(uri);
 }
 
-function generateSrcSet(breakpoints: Breakpoint[]): string {
+function generateSrcSet(
+  pluginContext: ResponsiveImagePlugin,
+  breakpoints: Breakpoint[],
+): string {
   if (breakpoints.length === 1) {
-    return getHashedUriOrPlaceholder(breakpoints[0].uri);
+    return getHashedUriOrPlaceholder(pluginContext, breakpoints[0].uri);
   }
 
   return breakpoints
     .sort(byIncreasingWidth)
-    .map(({ uri, width }) => `${getHashedUriOrPlaceholder(uri)} ${width}w`)
+    .map(
+      ({ uri, width }) =>
+        `${getHashedUriOrPlaceholder(pluginContext, uri)} ${width}w`,
+    )
     .join(', ');
 }
 
 export function enhance(
+  pluginContext: ResponsiveImagePlugin,
   source: string,
   images: ConversionResponsiveImage[],
 ): string {
@@ -386,7 +402,10 @@ export function enhance(
           enhancedImage += `media="(max-width: ${source.maxViewport}px)" `;
         }
 
-        enhancedImage += `srcset="${generateSrcSet(breakpoints)}" `;
+        enhancedImage += `srcset="${generateSrcSet(
+          pluginContext,
+          breakpoints,
+        )}" `;
         enhancedImage += '/>\n';
       }
 

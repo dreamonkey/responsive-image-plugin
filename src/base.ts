@@ -2,17 +2,16 @@ import { existsSync, mkdirSync } from 'fs';
 import { isUndefined, mapKeys } from 'lodash';
 import { join, parse, posix } from 'path';
 import { Dictionary } from 'ts-essentials';
-import { ResponsiveImagePluginConfig } from './config';
 import { LiteralUnion } from './helpers';
-import { WebpackLogger } from './webpack-logger';
+import ResponsiveImagePlugin from './responsive-image-plugin';
 
 // eslint-disable-next-line @typescript-eslint/unbound-method
 export const { join: posixJoin } = posix;
 
 export interface BaseAdapter<Params extends unknown[]> {
   (...params: Params): Promise<Buffer>;
-  setup?: () => void | Promise<void>;
-  teardown?: () => void | Promise<void>;
+  setup?: (pluginContext: ResponsiveImagePlugin) => void | Promise<void>;
+  teardown?: (pluginContext: ResponsiveImagePlugin) => void | Promise<void>;
 }
 
 // Slightly different than webpack version, as we filter out entries with `onlyModule` set to true
@@ -31,44 +30,6 @@ export interface BaseConfig {
   viewportAliases: ViewportAliasesMap;
   defaultSize: number;
 }
-
-let _logger: WebpackLogger | undefined;
-let _resolveAliases: AliasOption[] = [];
-let _options: ResponsiveImagePluginConfig | undefined;
-
-export const urlReplaceMap: Record<string, string> = {};
-
-export const pluginContext = {
-  get logger(): WebpackLogger {
-    if (isUndefined(_logger)) {
-      throw new Error('Logger has not been initialized properly');
-    }
-    return _logger;
-  },
-  set logger(l: WebpackLogger) {
-    _logger = l;
-  },
-
-  get options(): ResponsiveImagePluginConfig {
-    if (isUndefined(_options)) {
-      throw new Error('Options has not been initialized properly');
-    }
-    return _options;
-  },
-  set options(o: ResponsiveImagePluginConfig) {
-    _options = o;
-  },
-
-  get resolveAliases(): AliasOption[] {
-    if (isUndefined(_resolveAliases)) {
-      throw new Error('Resolve aliases has not been initialized properly');
-    }
-    return _resolveAliases;
-  },
-  set resolveAliases(a: AliasOption[]) {
-    _resolveAliases = a;
-  },
-};
 
 function resolveViewportAlias(
   viewportName: string,
@@ -146,6 +107,7 @@ export interface BaseResponsiveImage {
 }
 
 export function generateUri(
+  pluginContext: ResponsiveImagePlugin,
   path: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   uriBodyGenerator: (...args: any[]) => string,

@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { pluginContext } from './base';
+import ResponsiveImagePlugin from './responsive-image-plugin';
 
 // Needed to prevent TS to collapse `'value1' | 'value2' | string` to `string`, which breaks first parameter autocomplete
 // See: https://github.com/microsoft/TypeScript/issues/29729#issuecomment-832522611
@@ -50,7 +50,7 @@ export function convertRatioStringToNumber(ratio: string) {
 export function selectFromPreset<
   P extends Record<string, unknown>,
   K extends string,
->(presetMap: P, option: K): P[K] | null {
+>(pluginContext: ResponsiveImagePlugin, presetMap: P, option: K): P[K] | null {
   const presetMapKeys = Object.keys(presetMap);
 
   if (!presetMapKeys.includes(option)) {

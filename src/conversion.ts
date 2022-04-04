@@ -6,7 +6,6 @@ import {
   BaseResponsiveImage,
   BaseSource,
   generateUri,
-  pluginContext,
   SupportedImageFormats,
 } from './base';
 import {
@@ -16,6 +15,7 @@ import {
 import { sharpConverter } from './converters/sharp';
 import { deepFreeze, selectFromPreset } from './helpers';
 import { ResponsiveImage } from './parsing';
+import ResponsiveImagePlugin from './responsive-image-plugin';
 import { TransformationSource } from './transformation';
 
 const PREFERRED_FORMAT_ORDER: string[] = [
@@ -82,18 +82,21 @@ export function byMostEfficientFormat(
 }
 
 export const generateConversionUri = (
+  pluginContext: ResponsiveImagePlugin,
   path: string,
 ): ReturnType<typeof generateUri> =>
   // 'c' stands for 'converted'
-  generateUri(path, () => '-c');
+  generateUri(pluginContext, path, () => '-c');
 
 function generateFallbackSource(
+  pluginContext: ResponsiveImagePlugin,
   sourcePath: string,
   size: number,
   format: SupportedImageFormats,
 ): ConversionSource {
   const { name } = parse(sourcePath);
   const uri = generateConversionUri(
+    pluginContext,
     join(pluginContext.options.outputDir, `${name}.${format}`),
   );
 
@@ -137,7 +140,10 @@ export const pendingConversions: [
   uri: string,
 ][] = [];
 
-export function applyConversions(image: ResponsiveImage): void {
+export function applyConversions(
+  pluginContext: ResponsiveImagePlugin,
+  image: ResponsiveImage,
+): void {
   const { converter, enabledFormats } = pluginContext.options.conversion;
 
   if (isNull(converter)) {
@@ -162,7 +168,7 @@ export function applyConversions(image: ResponsiveImage): void {
         const convertedBreakpoints = source.breakpoints.map(
           ({ path, uri: sourceUri, width }) => {
             const uri = changeExtension(
-              generateConversionUri(sourceUri),
+              generateConversionUri(pluginContext, sourceUri),
               format,
             );
             pendingConversions.push([path, format, uri]);
@@ -182,6 +188,7 @@ export function applyConversions(image: ResponsiveImage): void {
       });
 
       const fallbackSource = generateFallbackSource(
+        pluginContext,
         image.originalPath,
         image.options.sizes.__default,
         format,
@@ -192,9 +199,12 @@ export function applyConversions(image: ResponsiveImage): void {
     .reduce((previous, current) => [...previous, ...current], []);
 }
 
-export function resolveConverter(converter: ConversionConfig['converter']) {
+export function resolveConverter(
+  pluginContext: ResponsiveImagePlugin,
+  converter: ConversionConfig['converter'],
+) {
   if (typeof converter === 'string') {
-    converter = selectFromPreset(presetConverters, converter);
+    converter = selectFromPreset(pluginContext, presetConverters, converter);
   }
 
   return converter;

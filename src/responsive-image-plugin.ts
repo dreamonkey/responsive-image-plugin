@@ -3,12 +3,7 @@ import { isNull, merge } from 'lodash';
 import { validate } from 'schema-utils';
 import { DeepPartial } from 'ts-essentials';
 import { Compilation, Compiler, Module, sources } from 'webpack';
-import {
-  AliasOption,
-  guardAgainstDefaultAlias,
-  pluginContext,
-  urlReplaceMap,
-} from './base';
+import { AliasOption, guardAgainstDefaultAlias } from './base';
 import { OPTIONS_SCHEMA, ResponsiveImagePluginConfig } from './config';
 import {
   guardAgainstUnsupportedSourceType,
@@ -24,6 +19,7 @@ import { pendingResizes, resolveResizer } from './resizing';
 import { pendingTransformations, resolveTransformer } from './transformation';
 import { TransformationAdapter } from './transformers/transformers';
 import { WebpackLogger } from './webpack-logger';
+import { join } from 'path';
 
 const { RawSource } = sources;
 
@@ -37,14 +33,17 @@ const rebuildModule = (compilation: Compilation, module: Module) =>
   });
 
 class ResponsiveImagePlugin {
+  // Shared with the loader
+  public options: ResponsiveImagePluginConfig;
+  public resolveAliases: AliasOption[] = [];
+  public logger!: WebpackLogger;
+  public urlReplaceMap: Record<string, string> = {};
+
   private pluginName = ResponsiveImagePlugin.name;
-  private options: ResponsiveImagePluginConfig;
 
-  private logger!: WebpackLogger;
-
-  private transformer: TransformationAdapter | null;
-  private resizer: ResizingAdapter | null;
-  private converter: ConversionAdapter | null;
+  private transformer!: TransformationAdapter | null;
+  private resizer!: ResizingAdapter | null;
+  private converter!: ConversionAdapter | null;
 
   constructor(options: DeepPartial<ResponsiveImagePluginConfig> = {}) {
     validate(OPTIONS_SCHEMA, options, {
@@ -53,19 +52,6 @@ class ResponsiveImagePlugin {
 
     this.options = merge({}, DEFAULT_OPTIONS, options);
     guardAgainstDefaultAlias(this.options.viewportAliases);
-
-    this.transformer = this.options.artDirection.transformer =
-      resolveTransformer(this.options.artDirection.transformer);
-
-    this.resizer = this.options.resolutionSwitching.resizer = resolveResizer(
-      this.options.resolutionSwitching.resizer,
-    );
-
-    this.converter = this.options.conversion.converter = resolveConverter(
-      this.options.conversion.converter,
-    );
-
-    pluginContext.options = this.options;
   }
 
   // Art direction: apply ratio transformations
@@ -84,7 +70,7 @@ class ResponsiveImagePlugin {
 
     logger.info('Initializing...');
 
-    await this.transformer.setup?.();
+    await this.transformer.setup?.(this);
 
     await Promise.all(
       pendingTransformations.map(
@@ -99,19 +85,19 @@ class ResponsiveImagePlugin {
 
             const uriWithHash = addHashToUri(uri, transformedImage);
 
-            urlReplaceMap[uri] = uriWithHash;
+            this.urlReplaceMap[uri] = uriWithHash;
 
             // TODO: does this add the files/assets to the cache?
             compilation.emitAsset(uriWithHash, new RawSource(transformedImage));
             await writeFile(transformationSource.path, transformedImage);
           } catch (e) {
-            pluginContext.logger.error(e);
+            this.logger.error(e);
           }
         },
       ),
     );
 
-    await this.transformer.teardown?.();
+    await this.transformer.teardown?.(this);
 
     logger.info('Completed!');
     logger.info('===============');
@@ -133,7 +119,7 @@ class ResponsiveImagePlugin {
 
     logger.info('Initializing...');
 
-    await this.resizer.setup?.();
+    await this.resizer.setup?.(this);
 
     await Promise.all(
       pendingResizes.map(async ([sourceImagePath, breakpoint, uri]) => {
@@ -144,18 +130,18 @@ class ResponsiveImagePlugin {
 
           const uriWithHash = addHashToUri(uri, resizedImage);
 
-          urlReplaceMap[uri] = uriWithHash;
+          this.urlReplaceMap[uri] = uriWithHash;
 
           // TODO: does this add the files/assets to the cache?
           compilation.emitAsset(uriWithHash, new RawSource(resizedImage));
           await writeFile(breakpoint.path, resizedImage);
         } catch (e) {
-          pluginContext.logger.error(e);
+          this.logger.error(e);
         }
       }),
     );
 
-    await this.resizer.teardown?.();
+    await this.resizer.teardown?.(this);
 
     logger.info('Completed!');
     logger.info('===============');
@@ -177,7 +163,7 @@ class ResponsiveImagePlugin {
 
     logger.info('Initializing...');
 
-    await this.converter.setup?.();
+    await this.converter.setup?.(this);
 
     await Promise.all(
       pendingConversions.map(async ([sourceImagePath, format, uri]) => {
@@ -190,36 +176,50 @@ class ResponsiveImagePlugin {
 
           const uriWithHash = addHashToUri(uri, convertedImage);
 
-          urlReplaceMap[uri] = uriWithHash;
+          this.urlReplaceMap[uri] = uriWithHash;
 
           // TODO: does this add the files/assets to the cache?
           compilation.emitAsset(uriWithHash, new RawSource(convertedImage));
         } catch (e) {
-          pluginContext.logger.error(e);
+          this.logger.error(e);
         }
       }),
     );
 
-    await this.converter.teardown?.();
+    await this.converter.teardown?.(this);
 
     logger.info('Completed!');
     logger.info('===============');
   }
 
   apply(compiler: Compiler) {
-    pluginContext.logger = this.logger = compiler.getInfrastructureLogger(
-      this.pluginName,
+    this.logger = compiler.getInfrastructureLogger(this.pluginName);
+
+    this.transformer = this.options.artDirection.transformer =
+      resolveTransformer(this, this.options.artDirection.transformer);
+
+    this.resizer = this.options.resolutionSwitching.resizer = resolveResizer(
+      this,
+      this.options.resolutionSwitching.resizer,
+    );
+
+    this.converter = this.options.conversion.converter = resolveConverter(
+      this,
+      this.options.conversion.converter,
     );
 
     compiler.resolverFactory.hooks.resolver
       .for('normal')
       .tap(this.pluginName, (resolver) => {
-        pluginContext.resolveAliases = resolver.options.alias.filter(
+        this.resolveAliases = resolver.options.alias.filter(
           ({ onlyModule, alias }) => !onlyModule && typeof alias === 'string',
         ) as AliasOption[];
       });
 
     compiler.hooks.thisCompilation.tap(this.pluginName, (compilation) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+      (compilation as any).pluginContext = this;
+
       compilation.hooks.finishModules.tapPromise(
         this.pluginName,
         async (modules) => {

@@ -1,13 +1,7 @@
 import sizeOf from 'image-size';
 import { isNull, isUndefined, map, times } from 'lodash';
 import { format, parse } from 'path';
-import {
-  Breakpoint,
-  generateUri,
-  getTempImagesDir,
-  pluginContext,
-  SizesMap,
-} from './base';
+import { Breakpoint, generateUri, getTempImagesDir, SizesMap } from './base';
 import {
   convertRatioStringToNumber,
   deepFreeze,
@@ -16,6 +10,7 @@ import {
 import { ResponsiveImage } from './parsing';
 import { ResizingAdapter, ResizingAdapterPresets } from './resizers/resizers';
 import { sharpResizer } from './resizers/sharp';
+import ResponsiveImagePlugin from './responsive-image-plugin';
 import {
   byIncreasingMaxViewport,
   isTransformationSource,
@@ -60,11 +55,12 @@ interface ResizingInterval {
 }
 
 export const generateResizingUri = (
+  pluginContext: ResponsiveImagePlugin,
   path: string,
   breakpoint: number,
 ): ReturnType<typeof generateUri> =>
   // 'b' stands for 'breakpoint'
-  generateUri(path, () => `-b_${breakpoint}`);
+  generateUri(pluginContext, path, () => `-b_${breakpoint}`);
 
 export function byIncreasingWidth(a: Breakpoint, b: Breakpoint): number {
   return a.width - b.width;
@@ -211,6 +207,7 @@ function estimateSizeOfBreakpointOrDelimiter(
 }
 
 function generateBreakpoints(
+  pluginContext: ResponsiveImagePlugin,
   minStepSize: number,
   currentInterval: ResizingInterval,
   nextInterval: ResizingInterval | undefined,
@@ -229,7 +226,11 @@ function generateBreakpoints(
     );
 
     breakpoints = breakpointViewports.map((breakpoint) => {
-      const uri = generateResizingUri(endDelimiter.path, breakpoint);
+      const uri = generateResizingUri(
+        pluginContext,
+        endDelimiter.path,
+        breakpoint,
+      );
 
       const destinationPath = format({
         dir: getTempImagesDir(),
@@ -288,7 +289,10 @@ export const pendingResizes: [
     for them, those breakpoints are re-allocated to wider viewports
     and removed when they cannot be used in the widest viewport available.
 */
-export function applyResizes(image: ResponsiveImage): void {
+export function applyResizes(
+  pluginContext: ResponsiveImagePlugin,
+  image: ResponsiveImage,
+): void {
   const {
     resizer,
     minViewport,
@@ -340,6 +344,7 @@ export function applyResizes(image: ResponsiveImage): void {
     }
 
     const breakpoints = generateBreakpoints(
+      pluginContext,
       minSizeDifference,
       currentInterval,
       nextInterval,
@@ -374,9 +379,12 @@ export function applyResizes(image: ResponsiveImage): void {
   image.sources = Array.from(viewportToSourceMap.values());
 }
 
-export function resolveResizer(resizer: ResizingConfig['resizer']) {
+export function resolveResizer(
+  pluginContext: ResponsiveImagePlugin,
+  resizer: ResizingConfig['resizer'],
+) {
   if (typeof resizer === 'string') {
-    resizer = selectFromPreset(presetResizers, resizer);
+    resizer = selectFromPreset(pluginContext, presetResizers, resizer);
   }
 
   return resizer;

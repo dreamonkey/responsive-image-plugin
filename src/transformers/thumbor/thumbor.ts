@@ -2,8 +2,8 @@ import { ChildProcess, exec as originalExec, spawn } from 'child_process';
 import got from 'got';
 import { join } from 'path';
 import { promisify } from 'util';
-import { pluginContext } from '../../base';
 import { convertRatioStringToNumber } from '../../helpers';
+import ResponsiveImagePlugin from '../../responsive-image-plugin';
 import {
   isCustomTransformation,
   TransformationDescriptor,
@@ -53,7 +53,7 @@ function generateTransformationUrl(
   return urlStart + cropping + urlSmart + path;
 }
 
-function setup() {
+function setup(pluginContext: ResponsiveImagePlugin) {
   dockerProcess = spawn(
     'docker',
     [

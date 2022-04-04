@@ -18,12 +18,12 @@ import {
   BaseSource,
   generateUri,
   getTempImagesDir,
-  pluginContext,
   resolveViewportAliases,
 } from './base';
 import { ResponsiveImageLoaderContext } from './config';
 import { deepFreeze, selectFromPreset } from './helpers';
 import { resolveImagePath, ResponsiveImage } from './parsing';
+import ResponsiveImagePlugin from './responsive-image-plugin';
 import { thumborDockerTransformer } from './transformers/thumbor/thumbor';
 import {
   TransformationAdapter,
@@ -177,6 +177,7 @@ function generateDescriptors(
 }
 
 export function normalizeTransformations(
+  pluginContext: ResponsiveImagePlugin,
   {
     inlineTransformations,
     transformationsToIgnore,
@@ -228,10 +229,11 @@ export function normalizeTransformations(
 }
 
 export const generateTransformationUri = (
+  pluginContext: ResponsiveImagePlugin,
   path: string,
   transformation: TransformationDescriptor,
 ): ReturnType<typeof generateUri> =>
-  generateUri(path, () => {
+  generateUri(pluginContext, path, () => {
     const { maxViewport, size } = transformation;
     // 'tb' stands for 'transformation breakpoint'
     let pathBody = `-tb_${maxViewport}`;
@@ -266,6 +268,7 @@ export const pendingTransformations: [
 
 // Used by the loader
 export function applyTransformations(
+  pluginContext: ResponsiveImagePlugin,
   loaderContext: ResponsiveImageLoaderContext,
   image: ResponsiveImage,
 ): void {
@@ -277,6 +280,7 @@ export function applyTransformations(
   }
 
   const transformations = normalizeTransformations(
+    pluginContext,
     image.options.inlineArtDirection,
     image.options.sizes,
   );
@@ -285,6 +289,7 @@ export function applyTransformations(
   each(transformations, (transformation) => {
     if (isCustomTransformation(transformation)) {
       transformation.path = resolveImagePath(
+        pluginContext,
         loaderContext,
         transformation.path,
       );
@@ -292,7 +297,11 @@ export function applyTransformations(
   });
 
   const transformationSources = transformations.map((transformation) => {
-    const uri = generateTransformationUri(image.originalPath, transformation);
+    const uri = generateTransformationUri(
+      pluginContext,
+      image.originalPath,
+      transformation,
+    );
 
     const { base } = parse(uri);
     const path = format({
@@ -328,10 +337,15 @@ export function applyTransformations(
 }
 
 export function resolveTransformer(
+  pluginContext: ResponsiveImagePlugin,
   transformer: TransformationConfig['transformer'],
 ) {
   if (typeof transformer === 'string') {
-    transformer = selectFromPreset(presetTransformers, transformer);
+    transformer = selectFromPreset(
+      pluginContext,
+      presetTransformers,
+      transformer,
+    );
   }
 
   return transformer;

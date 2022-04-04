@@ -4,12 +4,26 @@ import { ResponsiveImagePluginConfig } from './config';
 import { applyConversions, ConversionResponsiveImage } from './conversion';
 import { enhance, parse } from './parsing';
 import { applyResizes } from './resizing';
+import ResponsiveImagePlugin from './responsive-image-plugin';
 import { applyTransformations } from './transformation';
 
+interface ResponsiveImageCompilationEnhancement {
+  _compilation: {
+    pluginContext: ResponsiveImagePlugin;
+  };
+}
+
 const loader: LoaderDefinitionFunction<
-  DeepPartial<ResponsiveImagePluginConfig>
+  DeepPartial<ResponsiveImagePluginConfig>,
+  ResponsiveImageCompilationEnhancement
 > = function (source) {
-  const { sourceWithPlaceholders, parsedImages } = parse(this, source);
+  const { pluginContext } = this._compilation;
+
+  const { sourceWithPlaceholders, parsedImages } = parse(
+    pluginContext,
+    this,
+    source,
+  );
 
   if (parsedImages.length === 0) {
     return source;
@@ -17,15 +31,18 @@ const loader: LoaderDefinitionFunction<
 
   this.addDependency(this.resourcePath);
 
-  parsedImages.map((responsiveImage) =>
+  parsedImages.forEach((responsiveImage) =>
     this.addDependency(responsiveImage.originalPath),
   );
 
-  parsedImages.forEach((image) => applyTransformations(this, image));
-  parsedImages.forEach(applyResizes);
-  parsedImages.map(applyConversions);
+  parsedImages.forEach((image) =>
+    applyTransformations(pluginContext, this, image),
+  );
+  parsedImages.forEach((image) => applyResizes(pluginContext, image));
+  parsedImages.forEach((image) => applyConversions(pluginContext, image));
 
   return enhance(
+    pluginContext,
     sourceWithPlaceholders,
     parsedImages as ConversionResponsiveImage[],
   );
