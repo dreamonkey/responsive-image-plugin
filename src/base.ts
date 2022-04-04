@@ -26,6 +26,7 @@ export interface ViewportAliasesMap {
 }
 
 export interface BaseConfig {
+  dryRun: boolean;
   outputDir: string;
   viewportAliases: ViewportAliasesMap;
   defaultSize: number;

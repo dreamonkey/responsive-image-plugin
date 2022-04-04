@@ -316,35 +316,27 @@ export function parse(
   return { sourceWithPlaceholders: source, parsedImages: responsiveImages };
 }
 
+export const urlReplaceMap: Record<string, string> = {};
+
 // If we don't have the entry in the map, we haven't generated images yet,
 // so we put a placeholder to mark this file as needed for a rebuild later on.
 // If we have it, it will be the URI hashed version
-function getHashedUriOrPlaceholder(
-  pluginContext: ResponsiveImagePlugin,
-  uri: string,
-) {
-  return pluginContext.urlReplaceMap[uri] ?? generateUrlPlaceholder(uri);
+function getHashedUriOrPlaceholder(uri: string) {
+  return urlReplaceMap[uri] ?? generateUrlPlaceholder(uri);
 }
 
-function generateSrcSet(
-  pluginContext: ResponsiveImagePlugin,
-  breakpoints: Breakpoint[],
-): string {
+function generateSrcSet(breakpoints: Breakpoint[]): string {
   if (breakpoints.length === 1) {
-    return getHashedUriOrPlaceholder(pluginContext, breakpoints[0].uri);
+    return getHashedUriOrPlaceholder(breakpoints[0].uri);
   }
 
   return breakpoints
     .sort(byIncreasingWidth)
-    .map(
-      ({ uri, width }) =>
-        `${getHashedUriOrPlaceholder(pluginContext, uri)} ${width}w`,
-    )
+    .map(({ uri, width }) => `${getHashedUriOrPlaceholder(uri)} ${width}w`)
     .join(', ');
 }
 
 export function enhance(
-  pluginContext: ResponsiveImagePlugin,
   source: string,
   images: ConversionResponsiveImage[],
 ): string {
@@ -402,10 +394,7 @@ export function enhance(
           enhancedImage += `media="(max-width: ${source.maxViewport}px)" `;
         }
 
-        enhancedImage += `srcset="${generateSrcSet(
-          pluginContext,
-          breakpoints,
-        )}" `;
+        enhancedImage += `srcset="${generateSrcSet(breakpoints)}" `;
         enhancedImage += '/>\n';
       }
 

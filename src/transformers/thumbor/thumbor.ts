@@ -3,7 +3,6 @@ import got from 'got';
 import { join } from 'path';
 import { promisify } from 'util';
 import { convertRatioStringToNumber } from '../../helpers';
-import ResponsiveImagePlugin from '../../responsive-image-plugin';
 import {
   isCustomTransformation,
   TransformationDescriptor,
@@ -53,7 +52,17 @@ function generateTransformationUrl(
   return urlStart + cropping + urlSmart + path;
 }
 
-function setup(pluginContext: ResponsiveImagePlugin) {
+export const thumborDockerTransformer: TransformationAdapter = (
+  imagePath,
+  transformation,
+) => {
+  const url = generateTransformationUrl(imagePath, transformation);
+
+  return got(url).buffer();
+};
+
+thumborDockerTransformer.setup = (pluginContext) => {
+  pluginContext.logger.log('Starting Thumbor docker container');
   dockerProcess = spawn(
     'docker',
     [
@@ -79,25 +88,14 @@ function setup(pluginContext: ResponsiveImagePlugin) {
       ),
     ),
   );
-}
+};
 
-async function teardown() {
+thumborDockerTransformer.teardown = async (pluginContext) => {
+  pluginContext.logger.log('Shutting down Thumbor docker container');
   dockerProcess?.kill();
   // When executing multiple builds in sequence, as we do when testing,
   // this is needed to avoid the shutting down container to block the setup
   // of a new one
   await exec(`docker container stop ${DOCKER_CONTAINER_NAME}`);
   dockerProcess = undefined;
-}
-
-export const thumborDockerTransformer: TransformationAdapter = (
-  imagePath,
-  transformation,
-) => {
-  const url = generateTransformationUrl(imagePath, transformation);
-
-  return got(url).buffer();
 };
-
-thumborDockerTransformer.setup = setup;
-thumborDockerTransformer.teardown = teardown;

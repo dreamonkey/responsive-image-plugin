@@ -42,7 +42,6 @@ const loader: LoaderDefinitionFunction<
   parsedImages.forEach((image) => applyConversions(pluginContext, image));
 
   return enhance(
-    pluginContext,
     sourceWithPlaceholders,
     parsedImages as ConversionResponsiveImage[],
   );
