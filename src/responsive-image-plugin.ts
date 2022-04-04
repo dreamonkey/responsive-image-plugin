@@ -34,18 +34,16 @@ const rebuildModule = (compilation: Compilation, module: Module) =>
 
 let generationStatus: 'ready' | 'processing' | 'completed' = 'ready';
 let releaseWhenGenerationCompletedTimeout: NodeJS.Timeout;
-function waitForProcessingToComplete() {
-  return new Promise<void>((resolve) => {
-    releaseWhenGenerationCompletedTimeout = setTimeout(() => {
-      if (generationStatus === 'completed') {
-        resolve();
-      } else {
-        releaseWhenGenerationCompletedTimeout =
-          releaseWhenGenerationCompletedTimeout.refresh();
-      }
-    }, 2000);
-  });
-}
+const generationCompleted = new Promise<void>((resolve) => {
+  releaseWhenGenerationCompletedTimeout = setTimeout(() => {
+    if (generationStatus === 'completed') {
+      resolve();
+    } else {
+      releaseWhenGenerationCompletedTimeout =
+        releaseWhenGenerationCompletedTimeout.refresh();
+    }
+  }, 2000);
+});
 
 class ResponsiveImagePlugin {
   // Shared with the loader
@@ -122,7 +120,7 @@ class ResponsiveImagePlugin {
 
           urlReplaceMap[uri] = uriWithHash;
 
-          // TODO: does this add the files/assets to the cache?
+          // TODO: does this add the files/assets to the cache? No :(
           compilation.emitAsset(uriWithHash, new RawSource(image));
 
           await callback?.(operation, image);
@@ -217,9 +215,10 @@ class ResponsiveImagePlugin {
       // Force dry run builds to wait the main build, so that underlying modules are up to date
       if (this.options.dryRun) {
         this.logger.info(
-          'Dry run enabled for this plugin instace, waiting for main build to complete before proceeding...',
+          'Dry run enabled for this plugin instance, waiting for main build to complete before proceeding...',
         );
-        await waitForProcessingToComplete();
+        // Without this, we would get a race condition between compilations which would result in a broken build
+        await generationCompleted;
       }
     });
 
