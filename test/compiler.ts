@@ -17,6 +17,8 @@ export async function compiler(
       path: resolve(__dirname),
       filename: 'bundle.js',
     },
+    infrastructureLogging: { level: 'none' },
+    // infrastructureLogging: { level: 'log' },
     plugins: [new ResponsiveImagePlugin(options)],
     module: {
       rules: [
@@ -27,7 +29,7 @@ export async function compiler(
             // Transforms into a JS module returning the raw generated string
             'raw-loader',
             // Our loader
-            { loader: resolve(__dirname, '../src/responsive-image-loader.ts') },
+            ResponsiveImagePlugin.loader,
           ],
         },
       ],

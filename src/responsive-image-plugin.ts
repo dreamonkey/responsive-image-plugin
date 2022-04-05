@@ -34,18 +34,13 @@ const rebuildModule = (compilation: Compilation, module: Module) =>
 
 let generationStatus: 'ready' | 'processing' | 'completed' = 'ready';
 let releaseWhenGenerationCompletedTimeout: NodeJS.Timeout;
-const generationCompleted = new Promise<void>((resolve) => {
-  releaseWhenGenerationCompletedTimeout = setTimeout(() => {
-    if (generationStatus === 'completed') {
-      resolve();
-    } else {
-      releaseWhenGenerationCompletedTimeout =
-        releaseWhenGenerationCompletedTimeout.refresh();
-    }
-  }, 2000);
-});
+let generationCompleted: Promise<void>;
 
 class ResponsiveImagePlugin {
+  public static loader = require.resolve(
+    join(__dirname, 'responsive-image-loader'),
+  );
+
   // Shared with the loader
   public options: ResponsiveImagePluginConfig;
   public resolveAliases: AliasOption[] = [];
@@ -180,6 +175,21 @@ class ResponsiveImagePlugin {
   }
 
   apply(compiler: Compiler) {
+    // We initialize the generationCompleted promise here, since doing it outside would leave behind a dangling promise
+    // when compilation is skipped altogether, eg. when Quasar SSG AE is used and no files has been changed since last build
+    if (generationCompleted === undefined) {
+      generationCompleted = new Promise<void>((resolve) => {
+        releaseWhenGenerationCompletedTimeout = setTimeout(() => {
+          if (generationStatus === 'completed') {
+            resolve();
+          } else {
+            releaseWhenGenerationCompletedTimeout =
+              releaseWhenGenerationCompletedTimeout.refresh();
+          }
+        }, 2000);
+      });
+    }
+
     this.logger = compiler.getInfrastructureLogger(this.pluginName);
 
     this.options.artDirection.transformer = resolveTransformer(
