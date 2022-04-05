@@ -40,6 +40,7 @@ class ResponsiveImagePlugin {
   public static loader = require.resolve(
     join(__dirname, 'responsive-image-loader'),
   );
+  public static bgHandler = require.resolve(join(__dirname, 'bg-handler'));
 
   // Shared with the loader
   public options: ResponsiveImagePluginConfig;

@@ -93,9 +93,8 @@ or
 Add the plugin into your webpack config.
 
 ```javascript
-const {
-  ResponsiveImagePlugin,
-} = require('@dreamonkey/responsive-image-plugin');
+const { ResponsiveImagePlugin } =
+  require('@dreamonkey/responsive-image-plugin').default;
 
 webpackConf.plugins.push(
   new ResponsiveImagePlugin({
@@ -113,7 +112,7 @@ If you plan to process CSS background images, you should also include the packag
 
 ```javascript
 webpackConf.entry['responsive-bg-image-handler'] =
-  '@dreamonkey/responsive-image-plugin';
+  ResponsiveImagePlugin.bgHandler;
 ```
 
 ```html
@@ -128,9 +127,8 @@ NB: `src` attribute value could change dependending on your webpack `output.file
 Presumely due to some kind of incompatibility with [theirs HTML loader](https://github.com/quasarframework/quasar/issues/5383#issuecomment-560510363), you must tap into low level Vue template to use this plugin with [Quasar framework](https://quasar.dev/) (on which it has been tested and developed).
 
 ```javascript
-const {
-  ResponsiveImagePlugin,
-} = require('@dreamonkey/responsive-image-plugin');
+const { ResponsiveImagePlugin } =
+  require('@dreamonkey/responsive-image-plugin').default;
 
 webpackConf.plugins.push(
   new ResponsiveImagePlugin({

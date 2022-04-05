@@ -30,8 +30,7 @@
   "files": [
     "dist/src"
   ],
-  "loader": "dist/src/responsive-image-loader.js",
-  "main": "dist/src/main.js",
+  "main": "dist/src/responsive-image-plugin.js",
   "peerDependencies": {
     "webpack": "^5.0.0"
   },

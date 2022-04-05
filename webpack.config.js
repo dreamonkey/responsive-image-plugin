@@ -10,6 +10,7 @@ module.exports = {
   entry: [staticGenerationFallbackPath, bgImageHandlerPath],
   output: {
     path: resolve(__dirname, 'dist/src'),
+    filename: 'bg-handler.js',
     library: handlerFnName,
     libraryExport: 'default',
     libraryTarget: 'window',
