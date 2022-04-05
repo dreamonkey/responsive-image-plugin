@@ -155,7 +155,6 @@ function parseSizeProperty(
   );
 }
 
-// TODO: manage webpack aliases automatically
 export function resolveImagePath(
   pluginContext: ResponsiveImagePlugin,
   loaderContext: ResponsiveImageLoaderContext,

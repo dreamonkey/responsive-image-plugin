@@ -1,9 +1,9 @@
-# responsive-image-loader
+# responsive-image-plugin
 
 **New package, who dis?**
 
 A webpack plugin to automagically bring your website images to a whole new level of responsiveness!
-This plugin derives from our previous attempt to solve the same problem [using only a webpack loader](https://github.com/dreamonkey/responsive-image-loader).
+This plugin derives from our previous attempt to solve the same problem [using only a webpack loader](https://github.com/dreamonkey/responsive-image-loader). If you were using it, check out the [migration guide](#migration).
 
 This plugin tackles in an unified way three main problems with images on the web nowadays:
 
@@ -43,10 +43,10 @@ For more info, check out the [issue](https://github.com/quasarframework/quasar/i
 - [Installation](#installation)
   - [Plugin](#plugin)
   - [Engines](#engines)
+- [Migration](#migration)
 - [Usage](#usage)
 - [Configuration](#configuration)
   - [Global configuration](#global-configuration)
-  - [Paths](#paths)
   - [Conversion](#conversion)
   - [Resolution Switching](#resolution-switching)
   - [Art Direction](#art-direction)
@@ -58,23 +58,21 @@ For more info, check out the [issue](https://github.com/quasarframework/quasar/i
 
 Features we'd like to implement, by most-wanted order.
 
-<!-- TODO: -->
-
-- [ ] [Add PNG to supported formats](https://github.com/dreamonkey/responsive-image-loader/issues/16)
-- [ ] [Define defaults for arbitrary groups of images](https://github.com/dreamonkey/responsive-image-loader/issues/10)
-- [ ] [Write more granular unit tests](https://github.com/dreamonkey/responsive-image-loader/issues/17)
-- [ ] [Add TSDocs to public methods](https://github.com/dreamonkey/responsive-image-loader/issues/18)
-- [ ] [Support Cloudinary adapter for transformer, resizer and converter](https://github.com/dreamonkey/responsive-image-loader/issues/15)
-- [ ] [Support video conversion and processing](https://github.com/dreamonkey/responsive-image-loader/issues/11)
-- [ ] [Test with HMR](https://github.com/dreamonkey/responsive-image-loader/issues/14)
-- [ ] [Pass-through custom configuration to underlying engines](https://github.com/dreamonkey/responsive-image-loader/issues/19)
+- [ ] [Add PNG to supported formats](https://github.com/dreamonkey/responsive-image-plugin/issues/21)
+- [ ] [Define defaults for arbitrary groups of images](https://github.com/dreamonkey/responsive-image-plugin/issues/25)
+- [ ] [Write more granular unit tests](https://github.com/dreamonkey/responsive-image-plugin/issues/19)
+- [ ] [Add TSDocs to public methods](https://github.com/dreamonkey/responsive-image-plugin/issues/18)
+- [ ] [Support Cloudinary adapter for transformer, resizer and converter](https://github.com/dreamonkey/responsive-image-plugin/issues/22)
+- [ ] [Support video conversion and processing](https://github.com/dreamonkey/responsive-image-plugin/issues/24)
+- [ ] [Test with HMR](https://github.com/dreamonkey/responsive-image-plugin/issues/23)
+- [ ] [Pass-through custom configuration to underlying engines](https://github.com/dreamonkey/responsive-image-plugin/issues/17)
 
 ## <span id="donations"></span> Donations and shameless self-advertisement
 
 [Dreamonkey](https://dreamonkey.com/) is a software house based in Reggio Emilia, Italy.
 We release packages as open-source when we feel they could benefit the entire community, nontheless we spend a considerabile amount of time studying, coding, maintaining and enhancing them.
 
-Does your business or personal projects depend on our packages? Consider donating here on Github to help us maintain them and allow us to create new ones!
+Does your business or personal projects depend on our packages, or you need a particular feature implemented which would benefit the whole community? Consider [donating here on Github](https://github.com/sponsors/dreamonkey) to help us maintain and develop them, and allow us to create new ones!
 
 Do you need a UX and quality driven team to work on your project? Get in touch with us through our [incredibly elaborate quotation request page](https://dreamonkey.com/en/contacts/request-quotation) or our [much less cool contact form](https://dreamonkey.com/en/contacts/contact-us) and let's find out if we are the right choice for you!
 
@@ -82,11 +80,11 @@ Do you need a UX and quality driven team to work on your project? Get in touch w
 
 Install via
 
-`yarn add -D @dreamonkey/responsive-image-loader`
+`yarn add -D @dreamonkey/responsive-image-plugin`
 
 or
 
-`npm install -D @dreamonkey/responsive-image-loader`.
+`npm install -D @dreamonkey/responsive-image-plugin`.
 
 ### <span id="plugin"></span> Plugin
 
@@ -94,15 +92,20 @@ or
 
 Add the plugin into your webpack config.
 
-<!-- TODO: -->
-
 ```javascript
+const {
+  ResponsiveImagePlugin,
+} = require('@dreamonkey/responsive-image-plugin');
+
+webpackConf.plugins.push(
+  new ResponsiveImagePlugin({
+    /* ... */
+  }),
+);
+
 webpackConf.module.rules.push({
   test: /\.html$/,
-  loader: '@dreamonkey/responsive-image-loader',
-  options: {
-    /* ... */
-  },
+  loader: ResponsiveImagePlugin.loader,
 });
 ```
 
@@ -110,7 +113,7 @@ If you plan to process CSS background images, you should also include the packag
 
 ```javascript
 webpackConf.entry['responsive-bg-image-handler'] =
-  '@dreamonkey/responsive-image-loader';
+  '@dreamonkey/responsive-image-plugin';
 ```
 
 ```html
@@ -122,18 +125,25 @@ NB: `src` attribute value could change dependending on your webpack `output.file
 
 #### On Quasar framework
 
-Presumely due to some kind of incompatibility with [theirs HTML loader](https://github.com/quasarframework/quasar/issues/5383#issuecomment-560510363), you must tap into low level Vue template to use this loader with [Quasar framework](https://quasar.dev/) (on which it has been tested and developed).
+Presumely due to some kind of incompatibility with [theirs HTML loader](https://github.com/quasarframework/quasar/issues/5383#issuecomment-560510363), you must tap into low level Vue template to use this plugin with [Quasar framework](https://quasar.dev/) (on which it has been tested and developed).
 
 ```javascript
-webpackConf.module.rules.push({
-  test: /\.vue$/,
-  resourceQuery: /type=template/,
-  loader: '@dreamonkey/responsive-image-loader',
-  options: {
+const {
+  ResponsiveImagePlugin,
+} = require('@dreamonkey/responsive-image-plugin');
+
+webpackConf.plugins.push(
+  new ResponsiveImagePlugin({
     /* Quasar output folder */
     outputDir: '/img/',
     /* ... */
-  },
+  }),
+);
+
+webpackConf.module.rules.push({
+  test: /\.vue$/,
+  resourceQuery: /type=template/,
+  loader: ResponsiveImagePlugin.loader,
 });
 ```
 
@@ -155,12 +165,8 @@ Set `webpackConfig.infrastructureLogging = { level: 'log' }` to see resources pr
 
 ### <span id="engines"></span> Engines
 
-Conversion, art direction and resolution switching are powered via an adapter by a fully decoupled and swappable engine.
-Every engine has its installation guide (independent from this loader) and you can also provide your custom adapter to support a new engine (in which case, we welcome PRs!)
-
-#### [`sharp`](https://github.com/lovell/sharp) (conversion | resolution switching)
-
-Everything should "Just Work™" out-of-the-box. It's installed by default when adding the loader dependency, but check for [`libvips` dependency](https://sharp.pixelplumbing.com/en/stable/install/#libvips) if something doesn't work properly. If you get build errors at the first run, try deleting and re-installing the whole `node_modules` folder.
+Art Direction, Resolution Switching and Conversion, are powered via fully decoupled adapters which allow to swap engine as you please.
+Every engine has its installation guide (independent from this plugin) and you can also provide your custom adapter to support a new engine (in which case, we welcome PRs!)
 
 #### [`thumbor`](https://github.com/thumbor/thumbor) (art direction)
 
@@ -174,7 +180,22 @@ Then pull [docker Thumbor image](https://github.com/MinimalCompact/thumbor) runn
 
 This engine ships with a preset configuration.
 
-Due to its nature of spawning a brand new container for every build cycle, using `thumbor` will not leverage Thumbor builtcache mechanism, meaning build time will not decrease on subsequent runs.
+Due to its nature of spawning a brand new container for every build cycle, using `thumbor` will not leverage Thumbor built-in cache mechanism, meaning build time will not decrease on subsequent runs.
+
+#### [`sharp`](https://github.com/lovell/sharp) (resolution switching | conversion)
+
+Everything should "Just Work™" out-of-the-box. It's installed by default when adding the plugin dependency, but check for [`libvips` dependency](https://sharp.pixelplumbing.com/en/stable/install/#libvips) if something doesn't work properly. If you get build errors at the first run, try refreshing your lock file and `node_modules` folder.
+
+## <span id="migration"></span> Migration
+
+If you're coming from [previous iteration](https://github.com/dreamonkey/responsive-image-loader) of this project, there are some important changes to be aware of:
+
+- `paths.aliases` has been removed, the plugin now resolves paths using the same aliases defined into webpack, plus Quasar `~` special case;
+- `paths.outputDir` has been moved one level higher, into the global configuration;
+- options should now be provided to the plugin when creating a new instance, instead of the loader;
+- metadata generation is now decoupled from actual image generation, this means that adapters now:
+  - can be written as lambda functions;
+  - should only care about generating the actual image data and return it as a `Buffer`.
 
 ## <span id="usage"></span> Usage
 
@@ -308,7 +329,7 @@ Add `responsive` and `responsive-bg` attributes on any tag whose `background-ima
 
 All conversion, resolution switching and art direction options apply with the same API as if they were used on an `<img>` tag.
 
-To keep the same GUI both in development and production mode you should add a fallback `background-image` CSS rule (usually with the same value as `responsive-bg` attribute) which conditionally target the element when the loader is not applied. A `data-responsive-bg` attribute is added to every enhanced element for this reason.
+To keep the same GUI both in development and production mode you should add a fallback `background-image` CSS rule (usually with the same value as `responsive-bg` attribute) which conditionally target the element when the plugin is not applied. A `data-responsive-bg` attribute is added to every enhanced element for this reason.
 
 ```css
 .enhanced-bg-div:not([data-responsive-bg]) {
@@ -382,6 +403,30 @@ const options: DeepPartial<ResponsiveImagePluginConfig> = {
 
 ### <span id="global-configuration"></span> Global configuration
 
+#### `dryRun` (default: false)
+
+If set to true, this plugin instance will assume another plugin instance is in charge of generating and updating sources and it will halt its compilation waiting for generation to complete.
+Take care when using it as:
+
+- the process will wait undefinitely if no other instance completes the generation process;
+- the process will error out if more than one instance is in charge of generating sources.
+
+This option is needed when you need to generate different builds of the same application (eg. SSR which need a client and server version).
+
+```typescript
+const opt = { dryRun: isServer };
+```
+
+#### `outputDir` (default: '/')
+
+Specify a folder which will prefix images uri emitted by this plugin.
+Your production bundle probably isn't organized with a flat folder structure, so you'll want to use this options most of the time.
+
+```typescript
+// All images will be emitted into the bundle `img` folder
+const opt = { outputDir: '/img/' };
+```
+
 #### <span id="aliases"></span>`viewportAliases` (default: {})
 
 Maps of aliases to viewport widths which is used when specifying different sizes for resolution switching or when referencing a transformation.
@@ -405,18 +450,6 @@ If provided as a percentage (`size <= 1.00`) it's considered as the width size m
 If provided as a number bigger than `300` it's considered as the width in pixels.
 Value is capped to `0.10` on lower bound.
 
-### <span id="paths"></span> Paths
-
-#### `outputDir` (default: '/')
-
-Specify a folder which will prefix images uri emitted by this loader.
-Your production bundle probably isn't organized with a flat folder structure, so you'll want to use this options most of the time.
-
-```typescript
-// All images will be emitted into the bundle `img` folder
-const opt = { outputDir: '/img/' };
-```
-
 ### <span id="conversion"></span> Conversion
 
 #### `converter` (default: 'sharp')
@@ -425,29 +458,27 @@ Specify the adapter function to use for image format conversion.
 You can provide the name of a preset adapter (only `sharp` for now) **after you [installed it](#engines) properly on your system**.
 Providing `null` disables conversion.
 
-**The adapter cannot be a lambda function, or it won't inherit the loader context**
-
 ```typescript
 // Disables conversion
 const opt = { converter: null };
 
-// Provide custom adapter, **never use a lambda function**
+// Provide custom adapter
 const opt = {
-  converter: function (sourcePath, destinationPath, uriWithoutHash, format) {
+  converter: (sourcePath, destinationPath, uriWithoutHash, format) => {
     /**/
-    return breakpoint;
+    return convertedImageAsBuffer;
   },
 };
 
-// Provide custom adapter defined elsewere, **never use a lambda function**
-const conversionAdapter: ConversionAdapter = function (
+// Provide custom adapter defined elsewere
+const conversionAdapter: ConversionAdapter = (
   sourcePath,
   destinationPath,
   uriWithoutHash,
   format,
-) {
+) => {
   /**/
-  return breakpoint;
+  return convertedImageAsBuffer;
 };
 const opt = { converter: conversionAdapter };
 ```
@@ -473,8 +504,6 @@ If narrow viewports need less breakpoints than originally allocated for them, th
 Specify the adapter to use for image resizing.
 You can provide the name of a preset adapter (only `sharp` for now) **after you [installed it](#engines) properly on your system**.
 Providing `null` disables resolution switching.
-
-**The adapter cannot be a lambda function, or it won't inherit the loader context**
 
 ```typescript
 // Disables resolution switching
@@ -525,13 +554,11 @@ Specify the adapter to use for image transformations.
 You can provide the name of a preset adapter **after you [installed it](#engines) properly on your system**.
 Providing `null` disables art direction.
 
-**The adapter cannot be a lambda function, or it won't inherit the loader context**
-
 ```typescript
 // Disables art direction
 const opt = { transformer: null };
 
-// Provide custom adapter, **never use a lambda function**
+// Provide custom adapter
 const opt = {
   transformer: function (imagePath, transformations) {
     /**/
@@ -539,11 +566,11 @@ const opt = {
   },
 };
 
-// Provide custom adapter defined elsewere, **never use a lambda function**
-const transformationAdapter: TransformationAdapter = function (
+// Provide custom adapter defined elsewere
+const transformationAdapter: TransformationAdapter = (
   imagePath,
   transformations,
-) {
+) => {
   /**/
   return transformationSource;
 };
@@ -575,12 +602,12 @@ const opts = {
 ### Does it work in every possible scenario?
 
 **NO!**
-Being a webpack loader, it has limits derived by being a build-time tool: it will only work for images statically referenced in your code.
-If you are dynamically changing your `<img>` `src` attribute, this loader cannot help you. If you are doing so with a JS framework via dynamic bindings (Vue `:src="..."`, Angular `[src]="..."`, etc), changing your component to use slots instead could help you and make your components more flexible.
+Being a webpack plugin, it has limits derived by being a build-time tool: it will only work for images statically referenced in your code.
+If you are dynamically changing your `<img>` `src` attribute, this plugin cannot help you. If you are doing so with a JS framework via dynamic bindings (Vue `:src="..."`, Angular `[src]="..."`, etc), changing your component to use slots instead could help you and make your components more flexible.
 
-### Only use in production and/or with webpack 'filesystem' cache enabled
+### Only use in production <!-- and/or with webpack 'filesystem' cache enabled -->
 
-The compilation time overhead of this loader is REALLY high, due to image processing. It is not advisable to use it during development unless you have a really valid motivation to do so. You'll probably want to apply it conditionally to your webpack chain only when building for production.
+The compilation time overhead of this plugin is pretty high, due to image processing. It is not advisable to use it during development unless you have a really valid motivation to do so. You'll probably want to apply it conditionally to your webpack chain only when building for production.
 
 ```javascript
 if (process.env.NODE_ENV === "production") {
@@ -588,18 +615,20 @@ if (process.env.NODE_ENV === "production") {
 }
 ```
 
-Since Webpack 5 comes with a build-in cache system, you can leverage it to skip image generation step after the first run.
-This may allow you to also use the loader when in dev mode, even tho the loader will still execute (and thus re-generate images) if you change a file containing an image tagged as responsive, resulting in an extremely slow HMR.
+<!--
+TODO: cache support is broken, check out https://github.com/dreamonkey/responsive-image-plugin/issues/6#issuecomment-1088433467
 
-> Note this could actually be avoided by adding a loader-level cache mechanism skipping execution if the hash of image and options hasn't changed, but we haven't had the time to implement this. Any help is appreciated, and it will allow to use this loader in dev mode
+
+Since Webpack 5 comes with a build-in cache system, you can leverage it to skip image generation step after the first run.
+This may allow you to also use the plugin when in dev mode, even tho the plugin will still execute (and thus re-generate images) if you change a file containing an image tagged as responsive, resulting in an extremely slow HMR.
+
+> Note this could actually be avoided by adding a plugin-level cache mechanism skipping execution if the hash of image and options hasn't changed, but we haven't had the time to implement this. Any help is appreciated, and it will allow to use this plugin in dev mode
 
 ```javascript
 webpackConfig.cache.type = 'filesystem';
 ```
 
-### Why do I get `TypeError: Cannot read property 'replace' of undefined` when building?
-
-It means this loader is applied by Webpack, but it doesn't return anything to the next loader. It usually happens when you use `thumbor` transformer, but you forgot to start the docker daemon.
+-->
 
 ### Execution into Node environment
 
@@ -611,7 +640,7 @@ When executed into Node environment (eg. when building for Quasar SSR mode) and 
 
 1. `ReferenceError: window is not defined`
 
-   This error is thrown when the loader tries to register the handler into the global `window` object, as it isn't available in the Node environment.
+   This error is thrown when the plugin tries to register the handler into the global `window` object, as it isn't available in the Node environment.
 
 The handler is only useful at runtime on the client, the solution to both these problems is to include the handler registration only on the client webpack configuration.
 
@@ -628,9 +657,26 @@ extendWebpack(webpackConfig, { isClient }) {
 },
 ```
 
+### Multiple plugin instances (SSR/SSG generation)
+
+When generating multiple builds by instancing more than one plugin instance running in parallel, eg. Quasar official SSR mode or [this community SSG mode](https://github.com/freddy38510/quasar-app-extension-ssg), you should mark all instances as dry runs except the first one.
+
+When talking about Quasar SSR mode, this means you should use `isClient` or `isServer` SSR flags from the second parameter of `extendWebpack`.
+
+```js
+extendWebpack(webpackConfig, { isServer }) {
+  webpackConf.plugins.push(
+    new ResponsiveImagePlugin({
+      dryRun: isServer,
+      // ... other configurations
+    }),
+  );
+},
+```
+
 ### Pay attention to CSS selectors
 
-`<img>` will be wrapped into a `<picture>` when the loader kicks in.
+`<img>` will be wrapped into a `<picture>` when the plugin kicks in.
 Use a class to reference the image in your selectors and avoid direct-descendent selector.
 Check out class management into the [Usage](#usage) section.
 
@@ -713,7 +759,7 @@ Custom transformation images' path currently cannot contain `_` or `:` character
 ### How do I enable/disable conversion and/or resolution switching?
 
 Conversion and resolution-switching are enabled by default.
-If you want to disable them globally, set `conversion.converter` and/or `resolutionSwitching.resizer` to `null` into the loader options.
+If you want to disable them globally, set `conversion.converter` and/or `resolutionSwitching.resizer` to `null` into the plugin options.
 Currently there is no way to disable them on a per-image basis.
 
 ### Which default value should I use for `defaultSize`?
@@ -727,13 +773,13 @@ Because of this, you should set `defaultSize` to be the one of the image on the 
 
 Example: if the image occupies 100% of the viewport width on the maximum supported width of my website, default `size` will be `1.0`. If it occupies 50%, default `size` will be `0.5`.
 
-### Why doesn't the loader kick in on my images?
+### Why doesn't the plugin kick in on my images?
 
-The loader won't process the image if `responsive` attribute is missing or if `src` attribute is missing or empty. Also, art direction won't take place if `responsive-ad` is missing.
+The plugin won't process the image if `responsive` attribute is missing or if `src` attribute is missing or empty. Also, art direction won't take place if `responsive-ad` is missing.
 
 ### The fallback background image is downloaded anyway even when `responsive-bg` is active
 
-You must manually prevent the fallback background-image CSS rule from being applied when the loader kicks in.
+You must manually prevent the fallback background-image CSS rule from being applied when the plugin kicks in.
 Remember to wrap it into a `:not([data-responsive-bg])` selector!
 
 ### My child-referencing CSS selectors break when I use the background-image optimization feature

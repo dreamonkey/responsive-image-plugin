@@ -130,8 +130,3 @@ We can enhance reporting for each step, eg. with https://webpack.js.org/api/plug
 How do `compilation.codeGenerationResults.getSource()` work? Can it be used to avoid rebuilding the whole module? What's the correct way to access a module source?
 
 `module.getSourceTypes().has('javascript')` is this the correct way to filter out all modules without an actual source?
-
-## Breaking changes/migration
-
-Webpack aliases are automatically collected, `paths.aliases` has been removed and `paths.outputDir` has been moved one level up, now it's only `outputDir`
-Setup changed, options must be provided to the plugin now: TODO: add example
