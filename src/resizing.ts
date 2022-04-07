@@ -1,6 +1,7 @@
-import sizeOf from 'image-size';
+import { readFileSync } from 'fs-extra';
 import { isNull, isUndefined, map, times } from 'lodash';
 import { format, parse } from 'path';
+import probe from 'probe-image-size';
 import { Breakpoint, generateUri, getTempImagesDir, SizesMap } from './base';
 import {
   convertRatioStringToNumber,
@@ -67,10 +68,10 @@ export function byIncreasingWidth(a: Breakpoint, b: Breakpoint): number {
 }
 
 function getImgRatio(path: string): number {
-  const { height, width } = sizeOf(path);
-
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  return height! / width!;
+  const { height, width } = probe.sync(readFileSync(path))!;
+
+  return height / width;
 }
 
 function generateIntervalDelimiters(

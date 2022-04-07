@@ -1,7 +1,8 @@
 import { fromFile } from 'file-type';
-import sizeOf from 'image-size';
+import { readFileSync } from 'fs-extra';
 import { isNull, isUndefined } from 'lodash';
 import { format as formatPath, join, parse } from 'path';
+import probe from 'probe-image-size';
 import {
   BaseResponsiveImage,
   BaseSource,
@@ -110,7 +111,7 @@ function generateFallbackSource(
         uri,
         // TODO: we could use sharp here and into resizig, but it would force us to make everything async
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        width: sizeOf(sourcePath).width!,
+        width: probe.sync(readFileSync(sourcePath))!.width,
       },
     ],
     size,
