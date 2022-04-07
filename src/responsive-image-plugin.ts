@@ -36,11 +36,21 @@ let generationStatus: 'ready' | 'processing' | 'completed' = 'ready';
 let releaseWhenGenerationCompletedTimeout: NodeJS.Timeout;
 let generationCompleted: Promise<void>;
 
+function getBgHandlerPath() {
+  // Short circuit the path since it's not available at test time,
+  // since we don't run an intermediate build step
+  if (process.env.NODE_ENV === 'test') {
+    return '';
+  }
+
+  return require.resolve(join(__dirname, 'bg-handler'));
+}
+
 class ResponsiveImagePlugin {
   public static loader = require.resolve(
     join(__dirname, 'responsive-image-loader'),
   );
-  public static bgHandler = require.resolve(join(__dirname, 'bg-handler'));
+  public static bgHandler = getBgHandlerPath();
 
   // Shared with the loader
   public options: ResponsiveImagePluginConfig;

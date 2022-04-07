@@ -1,8 +1,10 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { writeFileSync } from 'fs';
 import { join, resolve } from 'path';
 import {
   IMG_TAG_PLACEHOLDER_PATTERN,
+  metadataCache,
+  urlReplaceMap,
   URL_PLACEHOLDER_PATTERN,
 } from 'src/parsing';
 import { existsOrCreateDirectory } from '../src/base';
@@ -47,6 +49,15 @@ describe('Responsive image loader', () => {
   });
 
   describe('Plain images', () => {
+    beforeEach(() => {
+      // Cleans the urlReplaceMap and metadataCache before each test,
+      // otherwise metadata generation would be skipped or old hashed URIs could be used
+      for (const key in urlReplaceMap) {
+        delete urlReplaceMap[key];
+      }
+      metadataCache.clear();
+    });
+
     describe('conversion disabled', () => {
       const conversionDisabled = { conversion: { converter: null } };
 
