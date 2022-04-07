@@ -2,7 +2,7 @@ import { DeepPartial } from 'ts-essentials';
 import { LoaderDefinitionFunction } from 'webpack';
 import { ResponsiveImagePluginConfig } from './config';
 import { applyConversions, ConversionResponsiveImage } from './conversion';
-import { enhance, parse } from './parsing';
+import { enhance, metadataCache, parse } from './parsing';
 import { applyResizes } from './resizing';
 import ResponsiveImagePlugin from './responsive-image-plugin';
 import { applyTransformations } from './transformation';
@@ -35,15 +35,20 @@ const loader: LoaderDefinitionFunction<
     this.addDependency(responsiveImage.originalPath),
   );
 
-  parsedImages.forEach((image) =>
-    applyTransformations(pluginContext, this, image),
-  );
-  parsedImages.forEach((image) => applyResizes(pluginContext, image));
-  parsedImages.forEach((image) => applyConversions(pluginContext, image));
+  // Skip metadata generation if this is the rebuild run, as we already generated images
+  if (!metadataCache.has(this.resourcePath)) {
+    parsedImages.forEach((image) =>
+      applyTransformations(pluginContext, this, image),
+    );
+    parsedImages.forEach((image) => applyResizes(pluginContext, image));
+    parsedImages.forEach((image) => applyConversions(pluginContext, image));
+
+    metadataCache.set(this.resourcePath, parsedImages);
+  }
 
   return enhance(
     sourceWithPlaceholders,
-    parsedImages as ConversionResponsiveImage[],
+    metadataCache.get(this.resourcePath) as ConversionResponsiveImage[],
   );
 };
 

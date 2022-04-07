@@ -316,6 +316,7 @@ export function parse(
 }
 
 export const urlReplaceMap: Record<string, string> = {};
+export const metadataCache: Map<string, ResponsiveImage[]> = new Map();
 
 // If we don't have the entry in the map, we haven't generated images yet,
 // so we put a placeholder to mark this file as needed for a rebuild later on.
