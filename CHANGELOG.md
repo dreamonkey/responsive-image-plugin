@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- fix: check module source to avoid edge cases
+
 ## 0.2.1
 
 - feat: replace image-size with probe-image-size for better format support
