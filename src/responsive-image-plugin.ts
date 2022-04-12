@@ -264,8 +264,9 @@ class ResponsiveImagePlugin {
 
           for (const module of modules) {
             // TODO: Is this the correct way to check this?
-            // Modules with type different than javascript may not have a source
-            if (!module.getSourceTypes().has('javascript')) {
+            // Using `module.getSourceTypes().has('javascript')` won't work some some dynamic modules
+            /* eslint-disable-next-line */
+            if (!(module as any)?._source?._value) {
               continue;
             }
 
