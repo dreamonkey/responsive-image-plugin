@@ -93,7 +93,7 @@ or
 Add the plugin into your webpack config.
 
 ```javascript
-const { ResponsiveImagePlugin } =
+const ResponsiveImagePlugin =
   require('@dreamonkey/responsive-image-plugin').default;
 
 webpackConf.plugins.push(
@@ -127,7 +127,7 @@ NB: `src` attribute value could change dependending on your webpack `output.file
 Presumely due to some kind of incompatibility with [theirs HTML loader](https://github.com/quasarframework/quasar/issues/5383#issuecomment-560510363), you must tap into low level Vue template to use this plugin with [Quasar framework](https://quasar.dev/) (on which it has been tested and developed).
 
 ```javascript
-const { ResponsiveImagePlugin } =
+const ResponsiveImagePlugin =
   require('@dreamonkey/responsive-image-plugin').default;
 
 webpackConf.plugins.push(
@@ -152,7 +152,7 @@ If you plan to process CSS background images, you should also include the packag
 
 ```javascript
 webpackConf.entry['responsive-bg-image-handler'] =
-  '@dreamonkey/responsive-image-loader';
+  ResponsiveImagePlugin.bgHandler;
 ```
 
 You don't need to manually include it via a `script` tag as Quasar already does it automatically for every `entry` property.
@@ -188,7 +188,7 @@ Everything should "Just Work™" out-of-the-box. It's installed by default when 
 
 If you're coming from [previous iteration](https://github.com/dreamonkey/responsive-image-loader) of this project, there are some important changes to be aware of:
 
-- `paths.aliases` has been removed, the plugin now resolves paths using the same aliases defined into webpack, plus Quasar `~` special case;
+- `paths.aliases` has been removed, the plugin now resolves paths using the same aliases defined into webpack, plus vue-loader `~` prefix marker for module requests (which is stripped away);
 - `paths.outputDir` has been moved one level higher, into the global configuration;
 - options should now be provided to the plugin when creating a new instance, instead of the loader;
 - metadata generation is now decoupled from actual image generation, this means that adapters now:
@@ -650,7 +650,7 @@ extendWebpack(webpackConfig, { isClient }) {
 
   if (isClient) {
     webpackConfig.entry['responsive-bg-image-handler'] =
-      '@dreamonkey/responsive-image-loader';
+      ResponsiveImagePlugin.bgHandler;
   }
 },
 ```
