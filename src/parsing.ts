@@ -73,8 +73,7 @@ function resolvePathAliases(
   pluginContext: ResponsiveImagePlugin,
   imagePath: string,
 ): string | undefined {
-  // TODO: manage Quasar special case for assets, which require a tilde in front of them
-  // no idea how we could fix this otherwise
+  // remove vue-loader tilde special case, which is used to mark a file as a module request
   if (imagePath.startsWith('~')) {
     imagePath = imagePath.substring(1);
   }
@@ -332,7 +331,10 @@ function generateSrcSet(breakpoints: Breakpoint[]): string {
 
   return breakpoints
     .sort(byIncreasingWidth)
-    .map(({ uri, width }) => `${getHashedUriOrPlaceholder(uri)} ${width}w`)
+    .map(
+      ({ uri, width }) =>
+        `${getHashedUriOrPlaceholder(uri)} ${Math.floor(width)}w`,
+    )
     .join(', ');
 }
 
