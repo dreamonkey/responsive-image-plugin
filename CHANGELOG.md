@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- fix: ensure all srcset sizes are an integer number
+
 ## 0.2.2
 
 - fix: check module source to avoid edge cases
