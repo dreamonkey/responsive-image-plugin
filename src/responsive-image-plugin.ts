@@ -262,6 +262,9 @@ class ResponsiveImagePlugin {
 
           const modulesToRebuild: Module[] = [];
 
+          // Tap into processAssets and change them like this
+          // https://github.com/freddy38510/quasar-app-extension-ssg/blob/1d8196f77eb908949fdce310b92ce3ecd5774631/src/webpack/plugin.server-side.js#L23
+
           for (const module of modules) {
             // TODO: Is this the correct way to check this?
             // Using `module.getSourceTypes().has('javascript')` won't work some some dynamic modules
@@ -277,6 +280,44 @@ class ResponsiveImagePlugin {
               if (!URL_PLACEHOLDER_PATTERN.exec(source)) {
                 continue;
               }
+
+              // TODO: register assets into to the correct module
+
+              // Taken from NormalModule emitFile which is working with cache
+              // if (!this.buildInfo.assets) {
+              //   this.buildInfo.assets = Object.create(null);
+              //   this.buildInfo.assetsInfo = new Map();
+              // }
+              // this.buildInfo.assets[name] = this.createSourceForAsset(
+              //   options.context,
+              //   name,
+              //   content,
+              //   sourceMap,
+              //   compilation.compiler.root,
+              // );
+              // this.buildInfo.assetsInfo.set(name, assetInfo);
+
+              // Taken from compilation.emitAsset which isn't working with cache
+              // emitAsset(file, source, assetInfo = {}) {
+              //   if (this.assets[file]) {
+              //     if (!isSourceEqual(this.assets[file], source)) {
+              //       this.errors.push(
+              //         new WebpackError(
+              //           `Conflict: Multiple assets emit different content to the same filename ${file}`
+              //         )
+              //       );
+              //       this.assets[file] = source;
+              //       this._setAssetInfo(file, assetInfo);
+              //       return;
+              //     }
+              //     const oldInfo = this.assetsInfo.get(file);
+              //     const newInfo = Object.assign({}, oldInfo, assetInfo);
+              //     this._setAssetInfo(file, newInfo, oldInfo);
+              //     return;
+              //   }
+              //   this.assets[file] = source;
+              //   this._setAssetInfo(file, assetInfo, undefined);
+              // }
 
               modulesToRebuild.push(module);
             } catch (e) {

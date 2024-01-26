@@ -238,7 +238,6 @@ export const generateTransformationUri = (
     // 'tb' stands for 'transformation breakpoint'
     let pathBody = `-tb_${maxViewport}`;
 
-    // TODO: path isn't apparently working
     if (isCustomTransformation(transformation)) {
       // 'p' stands for 'path'
       // 's' stands for 'size'
